@@ -2,22 +2,30 @@
 ### WANDB METADATA
 
 # this will be used to associate this run with a wandb project
-WANDB_PROJECT         : "iNat CV"
+WANDB_PROJECT         : "inat"
 WANDB_LOG_FREQ        : 100
+MULTIGPU              : false
+VALIDATION_PASS_SIZE  : 150
 
 #### EXPERIMENT PARAMETERS
-TENSORBOARD_LOG_DIR   : "/data-ssd/alex/experiments/slim_export/1608157217/log_dir"
-CHECKPOINT_DIR        : "/data-ssd/alex/experiments/slim_export/1608157217/checkpoints/ckpt"
-FINAL_SAVE_DIR        : "/data-ssd/alex/experiments/slim_export/1608157217/final_model/final"
-BACKUP_DIR            : "/data-ssd/alex/experiments/slim_export/1608157217/backup"
+TENSORBOARD_LOG_DIR   : "/root/inatVisionTraining/log_dir"
+CHECKPOINT_DIR        : "/root/inatVisionTraining/checkpoints/ckpt"
+FINAL_SAVE_DIR        : "/root/inatVisionTraining/final_model/final"
+BACKUP_DIR            : "/root/inatVisionTraining/backup"
+SHUFFLE_BUFFER_SIZE   : 10000
 
 
 #### DATASET PARAMETERS
 
-TRAINING_DATA         : "/data-ssd/alex/datasets/slim_export_20201213/train_cleaned.json"
-VAL_DATA              : "/data-ssd/alex/datasets/slim_export_20201213/val_cleaned.json"
-TEST_DATA             : "/data-ssd/alex/datasets/slim_export_20201213/test_cleaned.json"
-NUM_CLASSES           : 38148
+PRETRAINED_MODEL      : "imagenet"
+TRAINING_DATA         : "/root/inatVisionTraining/training_set.test.csv"
+VAL_DATA              : "/root/inatVisionTraining/validation_set.test.csv"
+TEST_DATA             : "/root/inatVisionTraining/validation_set.test.csv"
+NUM_CLASSES           : 81
+TRAIN_FULL_MODEL      : false
+DO_LABEL_SMOOTH       : true
+LABEL_SMOOTH_MODE     : "flat"
+LABEL_SMOOTH_PCT   : 0.1
 
 
 #### TRAINING PARAMETERS
@@ -27,13 +35,13 @@ NUM_CLASSES           : 38148
 TRAIN_MIXED_PRECISION : True
 
 # size of batch, per gpu
-BATCH_SIZE            : 256
+BATCH_SIZE            : 32
 
 # number of training epochs
-NUM_EPOCHS            : 80
+NUM_EPOCHS            : 500
 
 # initial learning rate for the model
-INITIAL_LEARNING_RATE : 0.05
+INITIAL_LEARNING_RATE : 0.01
 LR_DECAY_FACTOR       : 0.94
 EPOCHS_PER_LR_DECAY   : 4
 
@@ -54,3 +62,4 @@ OPTIMIZER_NAME        : "rmsprop"
 RMSPROP_RHO           : 0.9
 RMSPROP_MOMENTUM      : 0.9
 RMSPROP_EPSILON       : 1.0
+LABEL_COLUMN_NAME     : "taxon_id"

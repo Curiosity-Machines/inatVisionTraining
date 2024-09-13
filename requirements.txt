@@ -1,4 +1,5 @@
-pandas==0.21.0
-tensorflow==2.3.3
-PyYAML>=5.4
-numpy==1.17.2
+pandas==2.2.2
+tensorflow==2.17.0
+PyYAML>=6.0.2
+numpy==2.1.1
+wandb==0.18.0

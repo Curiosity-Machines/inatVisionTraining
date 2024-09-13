@@ -12,7 +12,7 @@ from tensorflow import keras
 import wandb
 from wandb.integration.keras import WandbMetricsLogger
 
-AUTOTUNE = tf.data.experimental.AUTOTUNE
+AUTOTUNE = tf.data.AUTOTUNE
 
 from datasets import inat_dataset
 from nets import nets
@@ -21,16 +21,14 @@ class LRLogger(tf.keras.callbacks.Callback):
     def on_epoch_begin(self, epoch, logs):
         lr = self.model.optimizer.learning_rate
         print("learning rate is {}".format(lr))
-        wandb.log({"lr": lr}, commit=False)
+        wandb.log({"lr": "{}".format(lr)}, commit=False)
 
 
 def make_training_callbacks(config):
     def lr_scheduler_fn(epoch):
-        return config["INITIAL_LEARNING_RATE"] * tf.math.pow(
-            config["LR_DECAY_FACTOR"], epoch // config["EPOCHS_PER_LR_DECAY"]
-        )
+        return config["INITIAL_LEARNING_RATE"] * (config["LR_DECAY_FACTOR"] ** (epoch // config["EPOCHS_PER_LR_DECAY"]))
 
-    checkpoint_file_name = "checkpoint-{epoch:02d}-{val_accuracy:.2f}"
+    checkpoint_file_name = "checkpoint-{epoch:02d}-{val_accuracy:.2f}.weights.h5"
     callbacks = [
         keras.callbacks.TensorBoard(
             log_dir=config["TENSORBOARD_LOG_DIR"],
@@ -54,7 +52,7 @@ def make_training_callbacks(config):
         tf.keras.callbacks.BackupAndRestore(
             backup_dir=config["BACKUP_DIR"],
         ),
-        WandbMetricsLogger(log_freq=config["WANDB_LOG_FREQ"]),
+        # WandbMetricsLogger(log_freq=config["WANDB_LOG_FREQ"]),
         LRLogger(),
     ]
 
@@ -139,8 +137,8 @@ def main():
         )
         
         # loss scale optimizer to prevent numeric underflow
-        if config["TRAIN_MIXED_PRECISION"]:
-            optimizer = tf.keras.mixed_precision.LossScaleOptimizer(optimizer)
+        # if config["TRAIN_MIXED_PRECISION"]:
+        #     optimizer = tf.keras.mixed_precision.LossScaleOptimizer(optimizer)
 
         # create neural network
         model = nets.make_neural_network(
@@ -179,8 +177,8 @@ def main():
             optimizer=optimizer,
             metrics=[
                 "accuracy",
-                tf.keras.metrics.TopKCategoricalAccuracy(k=3, name="top3 accuracy"),
-                tf.keras.metrics.TopKCategoricalAccuracy(k=10, name="top10 accuracy"),
+                tf.keras.metrics.TopKCategoricalAccuracy(k=3, name="top3_accuracy"),
+                tf.keras.metrics.TopKCategoricalAccuracy(k=10, name="top10_accuracy"),
             ],
         )
 
@@ -188,13 +186,13 @@ def main():
         training_callbacks = make_training_callbacks(config)
 
         # training & val step counts
-        STEPS_PER_EPOCH = np.ceil(num_train_examples / config["BATCH_SIZE"])
+        STEPS_PER_EPOCH = int(np.ceil(num_train_examples / config["BATCH_SIZE"]))
         VAL_IMAGE_COUNT = (
             config["VALIDATION_PASS_SIZE"]
             if config["VALIDATION_PASS_SIZE"] is not None
             else num_val_examples
         )
-        VAL_STEPS = np.ceil(VAL_IMAGE_COUNT / config["BATCH_SIZE"])
+        VAL_STEPS = int(np.ceil(VAL_IMAGE_COUNT / config["BATCH_SIZE"]))
         print(
             "{} val steps for {} val pass images of {} total val images.".format(
                 VAL_STEPS, VAL_IMAGE_COUNT, num_val_examples
