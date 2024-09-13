@@ -13,6 +13,7 @@ import wandb
 from wandb.integration.keras import WandbMetricsLogger
 
 AUTOTUNE = tf.data.AUTOTUNE
+tf.config.optimizer.set_jit(True) 
 
 from datasets import inat_dataset
 from nets import nets
@@ -41,7 +42,6 @@ def make_training_callbacks(config):
             embeddings_metadata={},
             write_steps_per_second=True,
         ),
-        tf.keras.callbacks.LearningRateScheduler(lr_scheduler_fn, verbose=1),
         tf.keras.callbacks.ModelCheckpoint(
             filepath=os.path.join(config["CHECKPOINT_DIR"], checkpoint_file_name),
             save_weights_only=True,
@@ -52,7 +52,7 @@ def make_training_callbacks(config):
         tf.keras.callbacks.BackupAndRestore(
             backup_dir=config["BACKUP_DIR"],
         ),
-        # WandbMetricsLogger(log_freq=config["WANDB_LOG_FREQ"]),
+        WandbMetricsLogger(log_freq=config["WANDB_LOG_FREQ"]),
         LRLogger(),
     ]
 
@@ -129,20 +129,26 @@ def main():
 
     with strategy.scope():
         # create optimizer for neural network
-        optimizer = keras.optimizers.RMSprop(
-            learning_rate=config["INITIAL_LEARNING_RATE"],
-            rho=config["RMSPROP_RHO"],
-            momentum=config["RMSPROP_MOMENTUM"],
-            epsilon=config["RMSPROP_EPSILON"],
-        )
-        
+        #optimizer = keras.optimizers.RMSprop(
+        #    learning_rate=config["INITIAL_LEARNING_RATE"],
+        #    rho=config["RMSPROP_RHO"],
+        #    momentum=config["RMSPROP_MOMENTUM"],
+        #    epsilon=config["RMSPROP_EPSILON"],
+        #)
+        STEPS_PER_EPOCH = int(np.ceil(num_train_examples / config["BATCH_SIZE"]))
+        #cosine_decay_scheduler = tf.keras.optimizers.schedules.CosineDecay(
+        #    config["INITIAL_LEARNING_RATE"], STEPS_PER_EPOCH * config["NUM_EPOCHS"], alpha=0.1
+        #)
+
+        optimizer = tf.keras.optimizers.Adam(learning_rate=config["INITIAL_LEARNING_RATE"])
+
         # loss scale optimizer to prevent numeric underflow
         # if config["TRAIN_MIXED_PRECISION"]:
         #     optimizer = tf.keras.mixed_precision.LossScaleOptimizer(optimizer)
 
         # create neural network
         model = nets.make_neural_network(
-            base_arch_name="xception",
+            base_arch_name=config["MODEL_NAME"],
             weights=config["PRETRAINED_MODEL"],
             image_size=config["IMAGE_SIZE"],
             n_classes=config["NUM_CLASSES"],
@@ -151,6 +157,7 @@ def main():
             ckpt=config["CHECKPOINT"] if "CHECKPOINT" in config else None,
             factorize=config["FACTORIZE_FINAL_LAYER"] if "FACTORIZE_FINAL_LAYER" in config else False,
             fact_rank=config["FACT_RANK"] if "FACT_RANK" in config else None,
+            dropout_rate=config["DROPOUT_PCT"] if "DROPOUT_PCT" in config else 0.5,
         )
 
         if model is None:
@@ -186,7 +193,6 @@ def main():
         training_callbacks = make_training_callbacks(config)
 
         # training & val step counts
-        STEPS_PER_EPOCH = int(np.ceil(num_train_examples / config["BATCH_SIZE"]))
         VAL_IMAGE_COUNT = (
             config["VALIDATION_PASS_SIZE"]
             if config["VALIDATION_PASS_SIZE"] is not None

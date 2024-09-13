@@ -1,6 +1,6 @@
 import tensorflow as tf
 from tensorflow import keras
-
+from tensorflow.keras import layers
 
 def make_neural_network(
     base_arch_name,
@@ -11,16 +11,20 @@ def make_neural_network(
     train_full_network,
     ckpt,
     factorize=False,
-    fact_rank=None
+    fact_rank=None,
+    dropout_rate=0.5  # Added dropout rate parameter
 ):
     image_size_with_channels = image_size + [3]
-    base_arch = keras.applications.Xception if base_arch_name == "xception" else None
+    base_arch = None
+    if base_arch_name == "xception":
+        base_arch = keras.applications.Xception
+    elif base_arch_name == "efficientnetb1":
+        base_arch = keras.applications.EfficientNetB1
     if not base_arch:
         print("Unsupported base architecture.")
         return None
 
     inputs = keras.layers.Input(shape=image_size_with_channels, dtype=input_dtype)
-
     base_model = base_arch(
         input_shape=image_size_with_channels, weights=weights, include_top=False
     )
@@ -30,16 +34,22 @@ def make_neural_network(
 
     x = base_model(inputs)
     
+    # Add dropout after the base model
+    x = keras.layers.Dropout(dropout_rate)(x)
+
     if factorize and fact_rank is not None:
         x = keras.layers.GlobalAveragePooling2D()(x)
         svd_u = keras.layers.Conv2D(fact_rank, [1, 1])(tf.expand_dims(x, 1))
+        # Add dropout before the final conv layer
+        svd_u = keras.layers.Dropout(dropout_rate)(svd_u)
         logits = keras.layers.Conv2D(n_classes, [1, 1])(svd_u)
         logits = keras.layers.Reshape([n_classes])(logits)
     else:
         x = keras.layers.GlobalAveragePooling2D()(x)
+        # Add dropout before the dense layer
+        x = keras.layers.Dropout(dropout_rate)(x)
         logits = keras.layers.Dense(n_classes, name="dense_logits")(x)
 
     output = keras.layers.Activation("softmax", dtype="float32", name="predictions")(logits)
     model = keras.Model(inputs=inputs, outputs=output)
-
     return model
