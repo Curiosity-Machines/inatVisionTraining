@@ -4,7 +4,7 @@
 # this will be used to associate this run with a wandb project
 WANDB_PROJECT         : "inat"
 WANDB_LOG_FREQ        : 100
-MULTIGPU              : false
+MULTIGPU              : true
 VALIDATION_PASS_SIZE  : 150
 
 #### EXPERIMENT PARAMETERS
@@ -18,10 +18,10 @@ SHUFFLE_BUFFER_SIZE   : 10000
 #### DATASET PARAMETERS
 
 PRETRAINED_MODEL      : "imagenet"
-TRAINING_DATA         : "/root/inatVisionTraining/training_set.test.csv"
-VAL_DATA              : "/root/inatVisionTraining/validation_set.test.csv"
-TEST_DATA             : "/root/inatVisionTraining/validation_set.test.csv"
-NUM_CLASSES           : 81
+TRAINING_DATA         : "/root/inatVisionTraining/training_set.csv"
+VAL_DATA              : "/root/inatVisionTraining/validation_set.csv"
+TEST_DATA             : "/root/inatVisionTraining/validation_set.csv"
+NUM_CLASSES           : 9598
 TRAIN_FULL_MODEL      : false
 DO_LABEL_SMOOTH       : true
 LABEL_SMOOTH_MODE     : "flat"
@@ -38,7 +38,7 @@ TRAIN_MIXED_PRECISION : True
 BATCH_SIZE            : 32
 
 # number of training epochs
-NUM_EPOCHS            : 500
+NUM_EPOCHS            : 10
 
 # initial learning rate for the model
 INITIAL_LEARNING_RATE : 0.01
@@ -49,7 +49,7 @@ EPOCHS_PER_LR_DECAY   : 4
 #### MODEL PARAMETERS
 
 # neural network architecture
-MODEL_NAME            : "xception"
+MODEL_NAME            : "efficientNetB1"
 
 # size of input
 IMAGE_SIZE            : [299,299]
