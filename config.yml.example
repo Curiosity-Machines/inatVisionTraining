@@ -52,7 +52,7 @@ EPOCHS_PER_LR_DECAY   : 4
 MODEL_NAME            : "efficientNetB1"
 
 # size of input
-IMAGE_SIZE            : [299,299]
+IMAGE_SIZE            : [240,240]
 
 # dropout percentage for layer between pool & logits
 DROPOUT_PCT           : 0.5
