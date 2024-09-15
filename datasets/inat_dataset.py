@@ -13,9 +13,9 @@ def _decode_img(img):
     img = tf.image.convert_image_dtype(img, tf.float32)
     return img
 
-def _process(file_path, label, num_classes):
+def _process(photo_id, label, num_classes):
     # Load and preprocess image
-    img = tf.io.read_file(file_path)
+    img = tf.io.read_file("data/" + photo_id + ".jpg")
     img = _decode_img(img)
     label = tf.one_hot(label, num_classes)
     return img, label
@@ -123,7 +123,7 @@ def make_dataset(
     # Map labels to indices
     df['label_index'] = df[label_column_name].map(label_to_index)
     
-    ds = tf.data.Dataset.from_tensor_slices((df["filename"], df["label_index"]))
+    ds = tf.data.Dataset.from_tensor_slices((df["photo_id"], df["label_index"]))
     ds = ds.shuffle(buffer_size=shuffle_buffer_size, reshuffle_each_iteration=True)
 
     process_partial = partial(_process, num_classes=num_classes)
