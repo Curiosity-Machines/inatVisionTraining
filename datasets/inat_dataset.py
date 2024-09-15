@@ -1,6 +1,9 @@
+# inat_dataset.py
+
 import pandas as pd
 import tensorflow as tf
 from functools import partial
+import json
 
 AUTOTUNE = tf.data.AUTOTUNE
 
@@ -67,6 +70,16 @@ def _prepare_dataset(
 
     ds = ds.map(lambda x, y: (preprocess_image(x), y), num_parallel_calls=AUTOTUNE)
 
+    # Apply data augmentation if specified
+    if augment:
+        data_augmentation = tf.keras.Sequential([
+            tf.keras.layers.RandomFlip('horizontal'),
+            tf.keras.layers.RandomRotation(0.1),
+            tf.keras.layers.RandomZoom(0.1),
+            # Add more augmentation layers if needed
+        ])
+        ds = ds.map(lambda x, y: (data_augmentation(x, training=True), y), num_parallel_calls=AUTOTUNE)
+
     # Batch the dataset
     ds = ds.batch(batch_size)
     
@@ -83,13 +96,34 @@ def make_dataset(
     shuffle_buffer_size=10_000,
     repeat_forever=True,
     augment=False,
+    label_to_index=None,  # New parameter
 ):
     df = _load_dataframe(path)
     num_examples = len(df)
-    num_classes = len(df[label_column_name].unique())
+    
+    if label_to_index is None:
+        # **Training Set**: Create label mapping
+        labels = sorted(df[label_column_name].unique())
+        label_to_index = {label: index for index, label in enumerate(labels)}
+        num_classes = len(labels)
 
-    ds = tf.data.Dataset.from_tensor_slices((df["filename"], df[label_column_name]))
+        # Write it to a file
+        with open(path.replace(".csv", "_label_mapping.json"), "w") as f:
+            json.dump(label_to_index, f)
+    else:
+        # **Validation Set**: Use existing label mapping
+        labels = None  # Not needed for validation
+        num_classes = len(label_to_index)
+        # Verify that all labels in validation set are present in training set
+        unique_val_labels = set(df[label_column_name].unique())
+        missing_labels = unique_val_labels - set(label_to_index.keys())
+        if missing_labels:
+            raise ValueError(f"Validation set contains labels not in training set: {missing_labels}")
 
+    # Map labels to indices
+    df['label_index'] = df[label_column_name].map(label_to_index)
+    
+    ds = tf.data.Dataset.from_tensor_slices((df["filename"], df["label_index"]))
     ds = ds.shuffle(buffer_size=shuffle_buffer_size, reshuffle_each_iteration=True)
 
     process_partial = partial(_process, num_classes=num_classes)
@@ -103,5 +137,8 @@ def make_dataset(
         augment=augment,
     )
 
-    return (ds, num_examples)
+    if labels is not None:
+        return (ds, num_examples, labels, label_to_index)
+    else:
+        return (ds, num_examples)
 
