@@ -4,6 +4,7 @@ import pandas as pd
 import tensorflow as tf
 from functools import partial
 import json
+from tensorflow.keras import backend as K
 
 AUTOTUNE = tf.data.AUTOTUNE
 
@@ -15,7 +16,8 @@ def _decode_img(img):
 
 def _process(photo_id, label, num_classes):
     # Load and preprocess image
-    img = tf.io.read_file("data/" + photo_id + ".jpg")
+    file_path = tf.strings.format("data/{}.jpg", photo_id)
+    img = tf.io.read_file(file_path)
     img = _decode_img(img)
     label = tf.one_hot(label, num_classes)
     return img, label
@@ -104,7 +106,7 @@ def make_dataset(
     if label_to_index is None:
         # **Training Set**: Create label mapping
         labels = sorted(df[label_column_name].unique())
-        label_to_index = {label: index for index, label in enumerate(labels)}
+        label_to_index = {int(label): index for index, label in enumerate(labels)}
         num_classes = len(labels)
 
         # Write it to a file
