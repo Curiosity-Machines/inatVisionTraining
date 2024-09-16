@@ -17,6 +17,8 @@ tf.config.optimizer.set_jit(True)
 
 from datasets import inat_dataset
 from nets import nets
+from progressive_training_callbacks import ProgressiveTrainingCallback
+from dynamic_dropout import DynamicDropout
 
 class LRLogger(tf.keras.callbacks.Callback):
     def on_epoch_begin(self, epoch, logs):
@@ -25,7 +27,7 @@ class LRLogger(tf.keras.callbacks.Callback):
         wandb.log({"lr": "{}".format(lr)}, commit=False)
 
 
-def make_training_callbacks(config):
+def make_training_callbacks(config, model, make_dataset_fn):
     def lr_scheduler_fn(epoch):
         return config["INITIAL_LEARNING_RATE"] * (config["LR_DECAY_FACTOR"] ** (epoch // config["EPOCHS_PER_LR_DECAY"]))
 
@@ -54,6 +56,7 @@ def make_training_callbacks(config):
         ),
         WandbMetricsLogger(log_freq=config["WANDB_LOG_FREQ"]),
         LRLogger(),
+        ProgressiveTrainingCallback(config, make_dataset_fn),
     ]
 
     return callbacks
@@ -88,101 +91,75 @@ def main():
     else:
         strategy = tf.distribute.get_strategy()
 
-    # load train & val datasets
-    if not os.path.exists(config["TRAINING_DATA"]):
-        print("Training data file doesn't exist.")
-        return
-    (train_ds, num_train_examples, train_labels, label_to_index) = inat_dataset.make_dataset(
-        config["TRAINING_DATA"],
-        label_column_name=config["LABEL_COLUMN_NAME"],
-        image_size=config["IMAGE_SIZE"],
-        batch_size=config["BATCH_SIZE"],
-        shuffle_buffer_size=config["SHUFFLE_BUFFER_SIZE"],
-        repeat_forever=True,
-        augment=True,
-        label_to_index=None
-    )
-    if train_ds is None:
-        print("No training dataset.")
-        return
-    if num_train_examples == 0:
-        print("No training examples.")
-        return
+    # Load label_to_index if exists
+    label_to_index = None
 
-    if not os.path.exists(config["VAL_DATA"]):
-        print("Validation data file doesn't exist.")
-        return
-    (val_ds, num_val_examples) = inat_dataset.make_dataset(
-        config["VAL_DATA"],
-        label_column_name=config["LABEL_COLUMN_NAME"],
-        image_size=config["IMAGE_SIZE"],
-        batch_size=config["BATCH_SIZE"],
-        shuffle_buffer_size=config["SHUFFLE_BUFFER_SIZE"],
-        repeat_forever=True,
-        augment=False,
-        label_to_index=label_to_index
-    )
-    if val_ds is None:
-        print("No val dataset.")
-        return
-    if num_val_examples == 0:
-        print("No val examples.")
-        return
-
+    # Phase 1: Progressive Training (Small Images, Minimal Dropout, No Augmentation)
     with strategy.scope():
-        # create optimizer for neural network
-        #optimizer = keras.optimizers.RMSprop(
-        #    learning_rate=config["INITIAL_LEARNING_RATE"],
-        #    rho=config["RMSPROP_RHO"],
-        #    momentum=config["RMSPROP_MOMENTUM"],
-        #    epsilon=config["RMSPROP_EPSILON"],
-        #)
-        STEPS_PER_EPOCH = int(np.ceil(num_train_examples / config["BATCH_SIZE"]))
-        #cosine_decay_scheduler = tf.keras.optimizers.schedules.CosineDecay(
-        #    config["INITIAL_LEARNING_RATE"], STEPS_PER_EPOCH * config["NUM_EPOCHS"], alpha=0.1
-        #)
+        # Load train & val datasets for Phase 1
+        (train_ds_small, num_train_examples, train_labels, label_to_index) = inat_dataset.make_dataset(
+            config["TRAINING_DATA"],
+            label_column_name=config["LABEL_COLUMN_NAME"],
+            image_size=[128, 128],
+            batch_size=config["BATCH_SIZE"],
+            shuffle_buffer_size=config["SHUFFLE_BUFFER_SIZE"],
+            repeat_forever=True,
+            augment=False,
+            label_to_index=label_to_index
+        )
+        if train_ds_small is None or num_train_examples == 0:
+            print("No training dataset for Phase 1.")
+            return
 
+        (val_ds, num_val_examples) = inat_dataset.make_dataset(
+            config["VAL_DATA"],
+            label_column_name=config["LABEL_COLUMN_NAME"],
+            image_size=[128, 128],
+            batch_size=config["BATCH_SIZE"],
+            shuffle_buffer_size=config["SHUFFLE_BUFFER_SIZE"],
+            repeat_forever=True,
+            augment=False,
+            label_to_index=label_to_index
+        )
+        if val_ds is None or num_val_examples == 0:
+            print("No validation dataset.")
+            return
+
+        # Create optimizer
+        STEPS_PER_EPOCH = int(np.ceil(num_train_examples / config["BATCH_SIZE"]))
         optimizer = tf.keras.optimizers.Adam(learning_rate=config["INITIAL_LEARNING_RATE"], amsgrad=True)
 
-        # loss scale optimizer to prevent numeric underflow
-        # if config["TRAIN_MIXED_PRECISION"]:
-        #     optimizer = tf.keras.mixed_precision.LossScaleOptimizer(optimizer)
-
-        # create neural network
+        # Create neural network with minimal dropout
         model = nets.make_neural_network(
             base_arch_name=config["MODEL_NAME"],
             weights=config["PRETRAINED_MODEL"],
-            image_size=config["IMAGE_SIZE"],
+            image_size=[128, 128],
             n_classes=config["NUM_CLASSES"],
             input_dtype=tf.float16 if config["TRAIN_MIXED_PRECISION"] else tf.float32,
             train_full_network=config["TRAIN_FULL_MODEL"],
             ckpt=config["CHECKPOINT"] if "CHECKPOINT" in config else None,
             factorize=config["FACTORIZE_FINAL_LAYER"] if "FACTORIZE_FINAL_LAYER" in config else False,
             fact_rank=config["FACT_RANK"] if "FACT_RANK" in config else None,
-            dropout_rate=config["DROPOUT_PCT"] if "DROPOUT_PCT" in config else 0.5,
+            dropout_rate=config.get("INITIAL_DROPOUT_RATE", 0.1),
             l2_reg=config["L2_REG"] if "L2_REG" in config else 1e-5,
-            augment=True
+            augment=False
         )
 
         if model is None:
             assert False, "No model to train."
 
+        # Define loss
         if config["DO_LABEL_SMOOTH"]:
             if config["LABEL_SMOOTH_MODE"] == "flat":
-                # with flat label smoothing we can do it all
-                # in the loss function
                 loss = tf.keras.losses.CategoricalCrossentropy(
                     label_smoothing=config["LABEL_SMOOTH_PCT"]
                 )
             else:
-                # with parent/heirarchical label smoothing
-                # we can't do it in the loss function, we have
-                # to adjust the labels in the dataset
                 assert False, "Unsupported label smoothing mode."
         else:
             loss = tf.keras.losses.CategoricalCrossentropy()
 
-        # compile the network for training
+        # Compile the network for training
         model.compile(
             loss=loss,
             optimizer=optimizer,
@@ -193,10 +170,10 @@ def main():
             ],
         )
 
-        # setup callbacks
-        training_callbacks = make_training_callbacks(config)
+        # Setup callbacks
+        training_callbacks = make_training_callbacks(config, model, inat_dataset.make_dataset)
 
-        # training & val step counts
+        # Training & val step counts
         VAL_IMAGE_COUNT = (
             config["VALIDATION_PASS_SIZE"]
             if config["VALIDATION_PASS_SIZE"] is not None
@@ -209,22 +186,58 @@ def main():
             )
         )
 
-        start = time.time()
-        history = model.fit(
-            train_ds,
+        # Phase 1 Training
+        print(f"Starting Phase 1 Training: Epochs 1 to {config.get('PROGRESSIVE_TRAINING_EPOCH', 20)}")
+        history_phase1 = model.fit(
+            train_ds_small,
             validation_data=val_ds,
             validation_steps=VAL_STEPS,
-            epochs=config["NUM_EPOCHS"],
+            epochs=config.get("PROGRESSIVE_TRAINING_EPOCH", 20),
             steps_per_epoch=STEPS_PER_EPOCH,
             callbacks=training_callbacks,
         )
 
-        end = time.time()
-        print("time elapsed during fit: {:.1f}".format(end - start))
-        print(history.history)
+        # Phase 2: Final Training (Large Images, Augmentation, Standard Dropout)
+        # Update Dropout Rate
+        for layer in model.layers:
+            if isinstance(layer, DynamicDropout):
+                print(f"Updating dropout rate from {layer.rate.numpy()} to {config['DROPOUT_PCT']}")
+                layer.set_rate(config['DROPOUT_PCT'])
+
+        # Rebuild the training dataset for Phase 2
+        print(f"Rebuilding training dataset for Phase 2 with image size {config['IMAGE_SIZE']} and augmentation enabled.")
+        (train_ds_large, _, _, _) = inat_dataset.make_dataset(
+            config["TRAINING_DATA"],
+            label_column_name=config["LABEL_COLUMN_NAME"],
+            image_size=config["IMAGE_SIZE"],
+            batch_size=config["BATCH_SIZE"],
+            shuffle_buffer_size=config["SHUFFLE_BUFFER_SIZE"],
+            repeat_forever=True,
+            augment=True,
+            label_to_index=None
+        )
+
+        # Calculate remaining epochs
+        remaining_epochs = config["NUM_EPOCHS"] - config.get("PROGRESSIVE_TRAINING_EPOCH", 20)
+        if remaining_epochs > 0:
+            print(f"Starting Phase 2 Training: Epochs {config.get('PROGRESSIVE_TRAINING_EPOCH', 20) + 1} to {config['NUM_EPOCHS']}")
+            history_phase2 = model.fit(
+                train_ds_large,
+                validation_data=val_ds,
+                validation_steps=VAL_STEPS,
+                epochs=config["NUM_EPOCHS"],
+                initial_epoch=config.get("PROGRESSIVE_TRAINING_EPOCH", 20),
+                steps_per_epoch=STEPS_PER_EPOCH,
+                callbacks=training_callbacks,
+            )
+        else:
+            print("Total epochs less than or equal to progressive training epoch. Skipping Phase 2.")
+
+        # Save the final model
         model.save(config["FINAL_SAVE_DIR"])
 
     wandb.finish()
+
 
 if __name__ == "__main__":
     main()

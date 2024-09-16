@@ -86,9 +86,9 @@ def preprocess_image(image, target_size):
     #max_value = tf.reduce_max(resized_image)
     #print("Min value:", min_value)
     #print("Max value:", max_value)
-    cropped_image = tf.image.resize_with_crop_or_pad(image, 768, 768)
+    resized_image = tf.image.resize_with_crop_or_pad(image, target_size[0], target_size[1])
 
-    return cropped_image
+    return resized_image
 
 def _prepare_dataset(
     ds,

@@ -8,20 +8,20 @@ MULTIGPU              : true
 VALIDATION_PASS_SIZE  : 150
 
 #### EXPERIMENT PARAMETERS
-TENSORBOARD_LOG_DIR   : "/root/inatVisionTraining/log_dir"
-CHECKPOINT_DIR        : "/root/inatVisionTraining/checkpoints/ckpt"
-FINAL_SAVE_DIR        : "/root/inatVisionTraining/final_model/final"
-BACKUP_DIR            : "/root/inatVisionTraining/backup"
+TENSORBOARD_LOG_DIR   : "/root/inat2/log_dir"
+CHECKPOINT_DIR        : "/root/inat2/checkpoints/ckpt"
+FINAL_SAVE_DIR        : "/root/inat2/final_model/final"
+BACKUP_DIR            : "/root/inat2/backup"
 SHUFFLE_BUFFER_SIZE   : 10000
 
 
 #### DATASET PARAMETERS
 
 PRETRAINED_MODEL      : "imagenet"
-TRAINING_DATA         : "/root/inatVisionTraining/training_set.csv"
-VAL_DATA              : "/root/inatVisionTraining/validation_set.csv"
-TEST_DATA             : "/root/inatVisionTraining/validation_set.csv"
-NUM_CLASSES           : 9598
+TRAINING_DATA         : "/root/inat2/training_set.trim.csv"
+VAL_DATA              : "/root/inat2/validation_set.test.csv"
+TEST_DATA             : "/root/inat2/validation_set.test.csv"
+NUM_CLASSES           : 81
 TRAIN_FULL_MODEL      : false
 DO_LABEL_SMOOTH       : true
 LABEL_SMOOTH_MODE     : "flat"
@@ -35,27 +35,31 @@ LABEL_SMOOTH_PCT   : 0.1
 TRAIN_MIXED_PRECISION : True
 
 # size of batch, per gpu
-BATCH_SIZE            : 32
+BATCH_SIZE            : 384
 
 # number of training epochs
-NUM_EPOCHS            : 10
+NUM_EPOCHS            : 500
 
 # initial learning rate for the model
-INITIAL_LEARNING_RATE : 0.01
+INITIAL_LEARNING_RATE : 0.001
 LR_DECAY_FACTOR       : 0.94
 EPOCHS_PER_LR_DECAY   : 4
+INITIAL_DROPOUT_RATE  : 0.1
+PROGRESSIVE_TRAINING_EPOCH  : 5 
+
 
 
 #### MODEL PARAMETERS
 
 # neural network architecture
-MODEL_NAME            : "efficientNetB1"
+MODEL_NAME            : "efficientnetb3"
 
 # size of input
-IMAGE_SIZE            : [240,240]
+IMAGE_SIZE            : [320,320]
 
 # dropout percentage for layer between pool & logits
-DROPOUT_PCT           : 0.5
+DROPOUT_PCT           : 0.4
+L2_REG                : 0.005
 
 # optiimzer
 OPTIMIZER_NAME        : "rmsprop"
