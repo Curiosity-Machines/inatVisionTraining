@@ -97,13 +97,16 @@ def _prepare_dataset(
     ## Convert to uint8 0-255
     #ds = ds.map(lambda x, y: (tf.cast(x * 255, tf.uint8), y), num_parallel_calls=AUTOTUNE)
 
-    ds = ds.map(lambda x, y: (tf.image.resize(x, image_size), y), num_parallel_calls=AUTOTUNE)
-
     if augment_magnitude > 0.0:
         aa = augment.RandAugment(magnitude=augment_magnitude)
             
+        ds = ds.map(lambda x, y: (tf.image.resize_with_crop_or_pad(x, 768, 768), y), num_parallel_calls=AUTOTUNE)
+
         ds = ds.map(lambda x, y: (aa.distort(x), y), num_parallel_calls=AUTOTUNE)
+
+        ds = ds.map(lambda x, y: (tf.image.resize(x, image_size), y), num_parallel_calls=AUTOTUNE)
     else:
+        ds = ds.map(lambda x, y: (tf.image.resize(x, image_size), y), num_parallel_calls=AUTOTUNE)
         ds = ds.map(lambda x, y: (tf.image.random_flip_left_right(x), y), num_parallel_calls=AUTOTUNE)
 
     # Batch the dataset

@@ -36,7 +36,7 @@ def make_neural_network(
     inputs = keras.layers.Input(shape=(input_size, input_size, 3), dtype=input_dtype)
 
     base_model = base_arch(
-        input_shape=(input_size, input_size, 3), weights=weights, include_top=False, pooling="avg"
+        input_shape=(input_size, input_size, 3), weights=weights, include_top=False
     )
     base_model.trainable = train_full_network
 
@@ -46,11 +46,13 @@ def make_neural_network(
     x = base_model(inputs)
 
     if factorize and fact_rank is not None:
+        x = keras.layers.GlobalAveragePooling2D(keepdims=True)(x)
         svd_u = layers.Conv2D(fact_rank, (1, 1))(x)
         svd_u = Dropout(dropout)(svd_u)
         logits = layers.Conv2D(n_classes, (1, 1))(svd_u)
         logits = layers.Reshape([n_classes])(logits)
     else:
+        x = keras.layers.GlobalAveragePooling2D()(x)
         x = Dropout(dropout)(x)
         logits = layers.Dense(n_classes, name="dense_logits")(x)
 

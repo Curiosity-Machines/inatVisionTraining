@@ -10,6 +10,7 @@ VALIDATION_PASS_SIZE  : 150
 #### EXPERIMENT PARAMETERS
 TENSORBOARD_LOG_DIR   : "/root/inat2/log_dir"
 CHECKPOINT_DIR        : "/root/inat2/checkpoints/ckpt"
+ITERATION_DIR         : "/root/inat2/checkpoints/iter"
 FINAL_SAVE_DIR        : "/root/inat2/final_model/final"
 BACKUP_DIR            : "/root/inat2/backup"
 SHUFFLE_BUFFER_SIZE   : 10000
@@ -35,19 +36,18 @@ LABEL_SMOOTH_PCT   : 0.1
 TRAIN_MIXED_PRECISION : True
 
 # size of batch, per gpu
-BATCH_SIZE            : 384
+BATCH_SIZE            : 256
 
 # number of training epochs
-NUM_EPOCHS            : 500
+NUM_EPOCHS            : 12
 
 # initial learning rate for the model
 INITIAL_LEARNING_RATE : 0.001
-LR_DECAY_FACTOR       : 0.94
+LR_DECAY_FACTOR       : 0.9
 EPOCHS_PER_LR_DECAY   : 4
-INITIAL_DROPOUT_RATE  : 0.1
-PROGRESSIVE_TRAINING_EPOCH  : 5 
-
-
+PROGRESSIVE_TRAINING_EPOCH  : 1 
+FACTORIZE_FINAL_LAYER : true
+FACT_RANK             : 32
 
 #### MODEL PARAMETERS
 
@@ -55,11 +55,11 @@ PROGRESSIVE_TRAINING_EPOCH  : 5
 MODEL_NAME            : "efficientnetb3"
 
 # size of input
-IMAGE_SIZE            : [320,320]
+SIZES                 : [128,185,242,300]
+AUGMENT_MAGNITUDES    : [5,8,12,15]
+DROPOUTS              : [0.1,0.2,0.3,0.4]
 
 # dropout percentage for layer between pool & logits
-DROPOUT_PCT           : 0.4
-L2_REG                : 0.005
 
 # optiimzer
 OPTIMIZER_NAME        : "rmsprop"

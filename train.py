@@ -212,9 +212,8 @@ def main():
 
             iteration += 1
 
-            prev_epoch = (iteration * epochs_per_iteration) - 1
-
-            last_checkpoint = os.path.join(config["CHECKPOINT_DIR"], f"checkpoint-{prev_epoch:02d}.weights.h5")
+            # Checkpoint dir gets wiped with each iteration
+            last_checkpoint = os.path.join(config["CHECKPOINT_DIR"], f"checkpoint-{epochs_per_iteration:02d}.weights.h5")
 
         # Save the final model
         save_dir = CONFIG["FINAL_SAVE_DIR"]
