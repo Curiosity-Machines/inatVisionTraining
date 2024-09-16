@@ -34,6 +34,10 @@ def _color(x: tf.Tensor, y: tf.Tensor) -> (tf.Tensor, tf.Tensor):
     x = tf.image.random_contrast(x, 0.7, 1.3)
     return x, y
 
+def crop_to_square(image, label):
+    shape = tf.shape(image)
+    min_dim = tf.minimum(shape[0], shape[1])
+    return tf.image.resize_with_crop_or_pad(image, min_dim, min_dim), label
 
 def _random_crop(x: tf.Tensor, y: tf.Tensor) -> (tf.Tensor, tf.Tensor):
     bbox = tf.constant([0.0, 0.0, 1.0, 1.0], dtype=tf.float32, shape=[1, 1, 4])
@@ -100,11 +104,10 @@ def _prepare_dataset(
     if augment_magnitude > 0.0:
         aa = augment.RandAugment(magnitude=augment_magnitude)
             
-        ds = ds.map(lambda x, y: (tf.image.resize_with_crop_or_pad(x, 768, 768), y), num_parallel_calls=AUTOTUNE)
-
+        ds = ds.map(lambda x, y: crop_to_square(x, y), num_parallel_calls=AUTOTUNE)
+        ds = ds.map(lambda x, y: (tf.image.resize(x, image_size), y), num_parallel_calls=AUTOTUNE)
         ds = ds.map(lambda x, y: (aa.distort(x), y), num_parallel_calls=AUTOTUNE)
 
-        ds = ds.map(lambda x, y: (tf.image.resize(x, image_size), y), num_parallel_calls=AUTOTUNE)
     else:
         ds = ds.map(lambda x, y: (tf.image.resize(x, image_size), y), num_parallel_calls=AUTOTUNE)
         ds = ds.map(lambda x, y: (tf.image.random_flip_left_right(x), y), num_parallel_calls=AUTOTUNE)

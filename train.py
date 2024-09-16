@@ -26,11 +26,9 @@ class LRLogger(tf.keras.callbacks.Callback):
         # wandb.log({"lr": "{}".format(lr)}, commit=False)
 
 
-def make_training_callbacks(config, model):
-    def lr_scheduler_fn(epoch):
-        return config["INITIAL_LEARNING_RATE"] * (config["LR_DECAY_FACTOR"] ** (epoch // config["EPOCHS_PER_LR_DECAY"]))
+def make_training_callbacks(config, iteration, model):
+    checkpoint_file_name = f"checkpoint-{iteration}-{{epoch:02d}}.weights.h5"
 
-    checkpoint_file_name = "checkpoint-{epoch:02d}.weights.h5"
     callbacks = [
         keras.callbacks.TensorBoard(
             log_dir=config["TENSORBOARD_LOG_DIR"],
@@ -164,7 +162,7 @@ def main():
             )
 
             # Setup callbacks
-            training_callbacks = make_training_callbacks(config, model)
+            training_callbacks = make_training_callbacks(config, iteration, model)
 
             (train_ds, num_train_examples, label_to_index) = inat_dataset.make_dataset(
                 config["TRAINING_DATA"],
@@ -213,11 +211,11 @@ def main():
             iteration += 1
 
             # Checkpoint dir gets wiped with each iteration
-            last_checkpoint = os.path.join(config["CHECKPOINT_DIR"], f"checkpoint-{epochs_per_iteration:02d}.weights.h5")
+            last_checkpoint = os.path.join(config["CHECKPOINT_DIR"], f"checkpoint-{iteration - 1}-{epochs_per_iteration:02d}.weights.h5")
 
         # Save the final model
         save_dir = CONFIG["FINAL_SAVE_DIR"]
-        model.save(f"{save_dir}/final.keras")
+        model.save(f"{save_dir}/final.h5")
 
     # wandb.finish()
 

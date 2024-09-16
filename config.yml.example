@@ -39,7 +39,7 @@ TRAIN_MIXED_PRECISION : True
 BATCH_SIZE            : 256
 
 # number of training epochs
-NUM_EPOCHS            : 12
+NUM_EPOCHS            : 4
 
 # initial learning rate for the model
 INITIAL_LEARNING_RATE : 0.001
