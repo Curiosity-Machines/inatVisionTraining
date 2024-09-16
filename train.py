@@ -27,7 +27,7 @@ class LRLogger(tf.keras.callbacks.Callback):
 
 
 def make_training_callbacks(config, iteration, model):
-    checkpoint_file_name = f"checkpoint-{iteration}-{{epoch:02d}}.weights.h5"
+    checkpoint_file_name = f"checkpoint-{iteration}-{{epoch:02d}}.weights.keras"
 
     callbacks = [
         keras.callbacks.TensorBoard(
@@ -43,7 +43,7 @@ def make_training_callbacks(config, iteration, model):
         ),
         tf.keras.callbacks.ModelCheckpoint(
             filepath=os.path.join(config["CHECKPOINT_DIR"], checkpoint_file_name),
-            save_weights_only=True,
+            save_weights_only=False,
             save_best_only=False,
             monitor="val_accuracy",
             verbose=1,
@@ -105,6 +105,8 @@ def main():
         val_ds = None
         num_val_examples = 0
 
+        optimizer_weights = None
+
         while remaining_epochs > 0:
             size = sizes[iteration]
             magnitude = magnitudes[iteration]
@@ -161,6 +163,12 @@ def main():
                 ],
             )
 
+            if optimizer_weights != None:
+                model.optimizer.build(model.trainable_variables)
+
+                for var, weight in zip(model.optimizer.variables, optimizer_weights):
+                    var.assign(weight)
+
             # Setup callbacks
             training_callbacks = make_training_callbacks(config, iteration, model)
 
@@ -206,12 +214,14 @@ def main():
                 callbacks=training_callbacks,
             )
 
+            optimizer_weights = [v.numpy() for v in model.optimizer.variables]
+
             remaining_epochs -= epochs_per_iteration
 
             iteration += 1
 
             # Checkpoint dir gets wiped with each iteration
-            last_checkpoint = os.path.join(config["CHECKPOINT_DIR"], f"checkpoint-{iteration - 1}-{epochs_per_iteration:02d}.weights.h5")
+            last_checkpoint = os.path.join(config["CHECKPOINT_DIR"], f"checkpoint-{iteration - 1}-{epochs_per_iteration:02d}.weights.keras")
 
         # Save the final model
         save_dir = CONFIG["FINAL_SAVE_DIR"]
