@@ -88,7 +88,7 @@ def main():
     else:
         strategy = tf.distribute.get_strategy()
 
-    # load train dataset
+    # load train & val datasets
     if not os.path.exists(config["TRAINING_DATA"]):
         print("Training data file doesn't exist.")
         return
@@ -100,7 +100,7 @@ def main():
         shuffle_buffer_size=config["SHUFFLE_BUFFER_SIZE"],
         repeat_forever=True,
         augment=True,
-        label_to_index=None,  # Create new mapping
+        label_to_index=None
     )
     if train_ds is None:
         print("No training dataset.")
@@ -109,7 +109,6 @@ def main():
         print("No training examples.")
         return
 
-    # load validation dataset using training label mapping
     if not os.path.exists(config["VAL_DATA"]):
         print("Validation data file doesn't exist.")
         return
@@ -121,20 +120,35 @@ def main():
         shuffle_buffer_size=config["SHUFFLE_BUFFER_SIZE"],
         repeat_forever=True,
         augment=False,
-        label_to_index=label_to_index,  # Use existing mapping
+        label_to_index=label_to_index
     )
     if val_ds is None:
-        print("No validation dataset.")
+        print("No val dataset.")
         return
     if num_val_examples == 0:
-        print("No validation examples.")
+        print("No val examples.")
         return
 
     with strategy.scope():
-        # Create optimizer
-        optimizer = tf.keras.optimizers.Adam(learning_rate=config["INITIAL_LEARNING_RATE"])
+        # create optimizer for neural network
+        #optimizer = keras.optimizers.RMSprop(
+        #    learning_rate=config["INITIAL_LEARNING_RATE"],
+        #    rho=config["RMSPROP_RHO"],
+        #    momentum=config["RMSPROP_MOMENTUM"],
+        #    epsilon=config["RMSPROP_EPSILON"],
+        #)
+        STEPS_PER_EPOCH = int(np.ceil(num_train_examples / config["BATCH_SIZE"]))
+        #cosine_decay_scheduler = tf.keras.optimizers.schedules.CosineDecay(
+        #    config["INITIAL_LEARNING_RATE"], STEPS_PER_EPOCH * config["NUM_EPOCHS"], alpha=0.1
+        #)
 
-        # Create neural network
+        optimizer = tf.keras.optimizers.Adam(learning_rate=config["INITIAL_LEARNING_RATE"], amsgrad=True)
+
+        # loss scale optimizer to prevent numeric underflow
+        # if config["TRAIN_MIXED_PRECISION"]:
+        #     optimizer = tf.keras.mixed_precision.LossScaleOptimizer(optimizer)
+
+        # create neural network
         model = nets.make_neural_network(
             base_arch_name=config["MODEL_NAME"],
             weights=config["PRETRAINED_MODEL"],
@@ -146,6 +160,8 @@ def main():
             factorize=config["FACTORIZE_FINAL_LAYER"] if "FACTORIZE_FINAL_LAYER" in config else False,
             fact_rank=config["FACT_RANK"] if "FACT_RANK" in config else None,
             dropout_rate=config["DROPOUT_PCT"] if "DROPOUT_PCT" in config else 0.5,
+            l2_reg=config["L2_REG"] if "L2_REG" in config else 1e-5,
+            augment=True
         )
 
         if model is None:
@@ -159,14 +175,14 @@ def main():
                     label_smoothing=config["LABEL_SMOOTH_PCT"]
                 )
             else:
-                # with parent/hierarchical label smoothing
+                # with parent/heirarchical label smoothing
                 # we can't do it in the loss function, we have
                 # to adjust the labels in the dataset
                 assert False, "Unsupported label smoothing mode."
         else:
             loss = tf.keras.losses.CategoricalCrossentropy()
 
-        # Compile the network for training
+        # compile the network for training
         model.compile(
             loss=loss,
             optimizer=optimizer,
@@ -177,16 +193,10 @@ def main():
             ],
         )
 
-        # Setup callbacks
+        # setup callbacks
         training_callbacks = make_training_callbacks(config)
 
-        # Save the label mapping
-        label_mapping_path = os.path.join(config["FINAL_SAVE_DIR"], "label_mapping.json")
-        with open(label_mapping_path, "w") as f:
-            json.dump(label_to_index, f)
-        print(f"Saved label mapping to {label_mapping_path}")
-
-        # Training & validation step counts
+        # training & val step counts
         VAL_IMAGE_COUNT = (
             config["VALIDATION_PASS_SIZE"]
             if config["VALIDATION_PASS_SIZE"] is not None
@@ -198,8 +208,6 @@ def main():
                 VAL_STEPS, VAL_IMAGE_COUNT, num_val_examples
             )
         )
-
-        STEPS_PER_EPOCH = int(np.ceil(num_train_examples / config["BATCH_SIZE"]))
 
         start = time.time()
         history = model.fit(
@@ -220,4 +228,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
