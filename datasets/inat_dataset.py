@@ -3,39 +3,15 @@ import tensorflow as tf
 from functools import partial
 from tensorflow.keras import backend as K
 import json
+import augment
 
 AUTOTUNE = tf.data.AUTOTUNE
 
 def _decode_img(img, file_path):
     img = tf.image.decode_jpeg(img, channels=3)
-    
-    # Assert that the image has three channels
-    tf.debugging.assert_equal(
-        tf.shape(img)[-1],
-        3,
-        message="Image does not have 3 channels (RGB)."
-    )
-    
-    # Compute min and max pixel values
-    min_value = tf.reduce_min(img)
-    max_value = tf.reduce_max(img)
-    
-    # Assert that pixel values are within [0, 255]
-    tf.debugging.assert_greater_equal(
-        min_value, tf.constant(0, dtype=img.dtype), message="Image has pixel values below 0."
-    )
-    tf.debugging.assert_less_equal(
-        max_value, tf.constant(255, dtype=img.dtype), message="Image has pixel values above 255."
-    )
-    
-    # Assert that the image is not entirely zero
-    total_sum = tf.reduce_sum(tf.cast(img, tf.int32))
-    tf.debugging.assert_greater(
-        total_sum, 0, message="Image is entirely zeros."
-    )
+     #img = tf.image.convert_image_dtype(img, tf.float32)
     
     return img
-
 
 def _process(photo_id, label, num_classes):
     # Load and preprocess image
@@ -45,65 +21,90 @@ def _process(photo_id, label, num_classes):
     label = tf.one_hot(label, num_classes)
     return img, label
 
+def _flip(x: tf.Tensor, y: tf.Tensor) -> (tf.Tensor, tf.Tensor):
+    # right left only
+    x = tf.image.random_flip_left_right(x)
+    return x, y
+
+
+def _color(x: tf.Tensor, y: tf.Tensor) -> (tf.Tensor, tf.Tensor):
+    x = tf.image.random_hue(x, 0.08)
+    x = tf.image.random_saturation(x, 0.6, 1.6)
+    x = tf.image.random_brightness(x, 0.05)
+    x = tf.image.random_contrast(x, 0.7, 1.3)
+    return x, y
+
+
+def _random_crop(x: tf.Tensor, y: tf.Tensor) -> (tf.Tensor, tf.Tensor):
+    bbox = tf.constant([0.0, 0.0, 1.0, 1.0], dtype=tf.float32, shape=[1, 1, 4])
+
+    begin, size, bbox_for_draw = tf.image.sample_distorted_bounding_box(
+        tf.shape(x),
+        bounding_boxes=bbox,
+        #area_range=(0.08, 1.0),
+        area_range=(0.5, 1.0),
+        aspect_ratio_range=(0.75, 1.33),
+        max_attempts=100,
+        min_object_covered=0.1,
+    )
+    x = tf.slice(x, begin, size)
+
+    return x, y
+
+
 def _load_dataframe(dataset_csv_path):
     df = pd.read_csv(dataset_csv_path)
     # Shuffle the dataset
     df = df.sample(frac=1, random_state=42)
     return df
 
-def preprocess_image(image, target_size):
-    # Determine the shape of the image
-    #shape = tf.shape(image)
-    #height, width = shape[0], shape[1]
-
-    ## Calculate the size of the square crop
-    #crop_size = tf.minimum(height, width)
-    #
-    ## Inset the crop size by 12.5%
-    #inset_factor = 0.875  # 1 - 0.125
-    #inset_crop_size = tf.cast(tf.cast(crop_size, tf.float32) * inset_factor, tf.int32)
-
-    ## Calculate offsets for center crop
-    #height_offset = (height - inset_crop_size) // 2
-    #width_offset = (width - inset_crop_size) // 2
-
-    ## Perform center crop
-    #cropped_image = tf.image.crop_to_bounding_box(
-    #    image, 
-    #    height_offset, 
-    #    width_offset, 
-    #    inset_crop_size, 
-    #    inset_crop_size
-    #)
-
-    ## Resize the image to the target size
-    #resized_image = tf.image.resize(cropped_image, target_size)
-    #print("Shape:", resized_image.shape)
-    #print("Data type:", resized_image.dtype)
-
-    ## Calculate and print min and max values
-    #min_value = tf.reduce_min(resized_image)
-    #max_value = tf.reduce_max(resized_image)
-    #print("Min value:", min_value)
-    #print("Max value:", max_value)
-    resized_image = tf.image.resize_with_crop_or_pad(image, target_size[0], target_size[1])
-
-    return resized_image
-
 def _prepare_dataset(
     ds,
-    image_size=(299, 299),
+    image_size=None,
     batch_size=32,
     repeat_forever=True,
-    augment=False,
+    augment_magnitude=0.0,
     label_to_index=None,
 ):
     if repeat_forever:
         ds = ds.repeat()
 
-    target_size = tf.constant([image_size[0], image_size[1]], dtype=tf.int32)
-    
-    ds = ds.map(lambda x, y: (preprocess_image(x, target_size), y), num_parallel_calls=AUTOTUNE)
+    #if augment:
+    #    # crop 100% of the time
+    #    ds = ds.map(lambda x, y: _random_crop(x, y), num_parallel_calls=AUTOTUNE)
+    #else:
+    #    # central crop
+    #    ds = ds.map(lambda x, y: (tf.image.central_crop(x, 0.875), y), num_parallel_calls=AUTOTUNE)
+
+    #ds = ds.map(lambda x, y: (tf.image.resize(x, image_size), y), num_parallel_calls=AUTOTUNE)
+
+    #if augment:
+    #    # flip 50% of the time
+    #    # the function already flips 50% of the time, so we call it 100% of the time
+    #    ds = ds.map(lambda x, y: _flip(x, y), num_parallel_calls=AUTOTUNE)
+    #    # do color 30% of the time
+    #    ds = ds.map(
+    #        lambda x, y: tf.cond(
+    #            tf.random.uniform([], 0, 1) > 0.7, lambda: _color(x, y), lambda: (x, y)
+    #        ),
+    #        num_parallel_calls=AUTOTUNE,
+    #    )
+    #    # make sure the color transforms haven't move any of the pixels outside of [0,1]
+    #    ds = ds.map(
+    #        lambda x, y: (tf.clip_by_value(x, 0, 1), y), num_parallel_calls=AUTOTUNE
+    #    )
+
+    ## Convert to uint8 0-255
+    #ds = ds.map(lambda x, y: (tf.cast(x * 255, tf.uint8), y), num_parallel_calls=AUTOTUNE)
+
+    ds = ds.map(lambda x, y: (tf.image.resize(x, image_size), y), num_parallel_calls=AUTOTUNE)
+
+    if augment_magnitude > 0.0:
+        aa = augment.RandAugment(magnitude=augment_magnitude)
+            
+        ds = ds.map(lambda x, y: (aa.distort(x), y), num_parallel_calls=AUTOTUNE)
+    else:
+        ds = ds.map(lambda x, y: (tf.image.random_flip_left_right(x), y), num_parallel_calls=AUTOTUNE)
 
     # Batch the dataset
     ds = ds.batch(batch_size)
@@ -116,11 +117,11 @@ def _prepare_dataset(
 def make_dataset(
     path,
     label_column_name,
-    image_size=(299, 299),
+    image_size=None,
     batch_size=32,
     shuffle_buffer_size=10_000,
     repeat_forever=True,
-    augment=False,
+    augment_magnitude=0.0,
     label_to_index=None
 ):
     df = _load_dataframe(path)
@@ -138,13 +139,12 @@ def make_dataset(
           json.dump(label_to_index, f)
     else:
         # **Validation Set**: Use existing label mapping
-        labels = None  # Not needed for validation
         num_classes = len(label_to_index)
         # Verify that all labels in validation set are present in training set
         unique_val_labels = set(df[label_column_name].unique())
         missing_labels = unique_val_labels - set(label_to_index.keys())
         if missing_labels:
-            raise ValueError(f"Validation set contains labels not in training set: {missing_labels}")
+            raise ValueError(f"set contains labels not in training set: {missing_labels}")
 
     df['label_index'] = df[label_column_name].map(label_to_index)
     ds = tf.data.Dataset.from_tensor_slices((df["photo_id"], df["label_index"]))
@@ -159,11 +159,8 @@ def make_dataset(
         image_size=image_size,
         batch_size=batch_size,
         repeat_forever=repeat_forever,
-        augment=augment,
+        augment_magnitude=augment_magnitude,
     )
 
-    if labels is not None:
-        return (ds, num_examples, labels, label_to_index)
-    else:
-        return (ds, num_examples)
+    return (ds, num_examples, label_to_index)
 
