@@ -17,7 +17,6 @@ tf.config.optimizer.set_jit(True)
 
 from datasets import inat_dataset
 from nets import nets
-from dynamic_dropout import DynamicDropout
 
 class LRLogger(tf.keras.callbacks.Callback):
     def on_epoch_begin(self, epoch, logs):
@@ -89,9 +88,11 @@ def main():
 
     # Load label_to_index if exists
     label_to_index = None
+    model = None
 
     # Phase 1: Progressive Training (Small Images, Minimal Dropout, No Augmentation)
     with strategy.scope():
+        batch_sizes = config.get("BATCH_SIZES") 
         sizes = config.get("SIZES") 
         magnitudes = config.get("AUGMENT_MAGNITUDES")
         dropouts = config.get("DROPOUTS")
@@ -111,6 +112,7 @@ def main():
             size = sizes[iteration]
             magnitude = magnitudes[iteration]
             dropout = dropouts[iteration]
+            batch_size = batch_sizes[iteration]
             epoch = epochs_per_iteration * iteration
 
             print(f"Training iteration {iteration} with {size}x{size}, augment: {magnitude}, dropout: {dropout} for {epochs_per_iteration} epochs, starting from {last_checkpoint}")
@@ -127,7 +129,7 @@ def main():
             # Create neural network with minimal dropout
             model = nets.make_neural_network(
                 base_arch_name=config["MODEL_NAME"],
-                weights=config["PRETRAINED_MODEL"],
+                weights=config.get("PRETRAINED_MODEL", None),
                 image_size=[size, size],
                 n_classes=config["NUM_CLASSES"],
                 input_dtype=tf.float16 if config["TRAIN_MIXED_PRECISION"] else tf.float32,
@@ -176,20 +178,20 @@ def main():
                 config["TRAINING_DATA"],
                 label_column_name=config["LABEL_COLUMN_NAME"],
                 image_size=(size,size),
-                batch_size=config["BATCH_SIZE"],
+                batch_size=batch_size,
                 shuffle_buffer_size=config["SHUFFLE_BUFFER_SIZE"],
                 repeat_forever=True,
                 augment_magnitude=magnitude,
                 label_to_index=label_to_index
             )
 
-            STEPS_PER_EPOCH = int(np.ceil(num_train_examples / config["BATCH_SIZE"]))
+            STEPS_PER_EPOCH = int(np.ceil(num_train_examples / batch_size))
 
             (val_ds, num_val_examples, label_to_index) = inat_dataset.make_dataset(
                 config["VAL_DATA"],
                 label_column_name=config["LABEL_COLUMN_NAME"],
                 image_size=(size, size),
-                batch_size=config["BATCH_SIZE"],
+                batch_size=batch_size,
                 shuffle_buffer_size=config["SHUFFLE_BUFFER_SIZE"],
                 repeat_forever=True,
                 augment_magnitude=0.0,
@@ -203,7 +205,7 @@ def main():
                 else num_val_examples
             )
 
-            VAL_STEPS = int(np.ceil(VAL_IMAGE_COUNT / config["BATCH_SIZE"]))
+            VAL_STEPS = int(np.ceil(VAL_IMAGE_COUNT / batch_size))
 
             model.fit(
                 train_ds,

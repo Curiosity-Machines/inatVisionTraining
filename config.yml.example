@@ -10,7 +10,6 @@ VALIDATION_PASS_SIZE  : 150
 #### EXPERIMENT PARAMETERS
 TENSORBOARD_LOG_DIR   : "/root/inat2/log_dir"
 CHECKPOINT_DIR        : "/root/inat2/checkpoints/ckpt"
-ITERATION_DIR         : "/root/inat2/checkpoints/iter"
 FINAL_SAVE_DIR        : "/root/inat2/final_model/final"
 BACKUP_DIR            : "/root/inat2/backup"
 SHUFFLE_BUFFER_SIZE   : 10000
@@ -45,7 +44,6 @@ NUM_EPOCHS            : 4
 INITIAL_LEARNING_RATE : 0.001
 LR_DECAY_FACTOR       : 0.9
 EPOCHS_PER_LR_DECAY   : 4
-PROGRESSIVE_TRAINING_EPOCH  : 1 
 FACTORIZE_FINAL_LAYER : true
 FACT_RANK             : 32
 

@@ -39,6 +39,47 @@ def crop_to_square(image, label):
     min_dim = tf.minimum(shape[0], shape[1])
     return tf.image.resize_with_crop_or_pad(image, min_dim, min_dim), label
 
+def random_crop_to_square(image, label):
+    #shape = tf.shape(image)
+    #height = shape[0]
+    #width = shape[1]
+    #
+    ## Determine the size of the square crop (minimum of height and width)
+    #crop_size = tf.minimum(height, width)
+    #
+    ## Calculate the maximum offset for the crop
+    #max_offset_height = height - crop_size
+    #max_offset_width = width - crop_size
+    #
+    ## Generate random offsets
+    #offset_height = tf.random.uniform(shape=(), maxval=max_offset_height + 1, dtype=tf.int32)
+    #offset_width = tf.random.uniform(shape=(), maxval=max_offset_width + 1, dtype=tf.int32)
+    #
+    ## Perform the crop
+    #cropped_image = tf.image.crop_to_bounding_box(
+    #    image,
+    #    offset_height=offset_height,
+    #    offset_width=offset_width,
+    #    target_height=crop_size,
+    #    target_width=crop_size
+    #)
+    #
+    #return cropped_image, label
+
+    bbox = tf.constant([0.0, 0.0, 1.0, 1.0], dtype=tf.float32, shape=[1, 1, 4])
+
+    begin, size, bbox_for_draw = tf.image.sample_distorted_bounding_box(
+        tf.shape(image),
+        bounding_boxes=bbox,
+        area_range=(0.66, 1.0),
+        aspect_ratio_range=(1.0, 1.0),
+        max_attempts=100,
+        min_object_covered=0.1,
+    )
+    image = tf.slice(image, begin, size)
+
+    return image, label
+
 def _random_crop(x: tf.Tensor, y: tf.Tensor) -> (tf.Tensor, tf.Tensor):
     bbox = tf.constant([0.0, 0.0, 1.0, 1.0], dtype=tf.float32, shape=[1, 1, 4])
 
@@ -102,9 +143,9 @@ def _prepare_dataset(
     #ds = ds.map(lambda x, y: (tf.cast(x * 255, tf.uint8), y), num_parallel_calls=AUTOTUNE)
 
     if augment_magnitude > 0.0:
-        aa = augment.RandAugment(magnitude=augment_magnitude)
+        aa = augment.RandAugment(magnitude=augment_magnitude, num_layers=3, exclude_ops=['Invert', 'Posterize', 'Solarize', 'SolarizeAdd'])
             
-        ds = ds.map(lambda x, y: crop_to_square(x, y), num_parallel_calls=AUTOTUNE)
+        ds = ds.map(lambda x, y: random_crop_to_square(x, y), num_parallel_calls=AUTOTUNE)
         ds = ds.map(lambda x, y: (tf.image.resize(x, image_size), y), num_parallel_calls=AUTOTUNE)
         ds = ds.map(lambda x, y: (aa.distort(x), y), num_parallel_calls=AUTOTUNE)
 
