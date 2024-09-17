@@ -21,5 +21,3 @@ from .model import EfficientNetV2_L
 from .model import EfficientNetV2_XL
 
 from tensorflow.keras.utils import get_custom_objects
-from .model import get_dropout
-get_custom_objects().update({'FixedDropout': get_dropout()})

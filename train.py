@@ -17,6 +17,7 @@ tf.config.optimizer.set_jit(True)
 
 from datasets import inat_dataset
 from nets import nets
+from efficientnetv2 import EfficientNetV2_S
 
 class ExponentialMovingAverage(tf.keras.callbacks.Callback):
     def __init__(self, decay):
@@ -122,7 +123,7 @@ def main():
 
     scheduler = LearningRateScheduler(
         initial_lr=config["INITIAL_LEARNING_RATE"],
-        warmup_epochs=5,  # Adjust based on your warmup duration
+        warmup_epochs=10,  # Adjust based on your warmup duration
         total_epochs=config["NUM_EPOCHS"],
         decay_rate=config["LR_DECAY_FACTOR"],
         decay_steps=config["EPOCHS_PER_LR_DECAY"]
@@ -164,19 +165,20 @@ def main():
                 weight_decay=1e-5,
             )
 
-            # Create neural network with minimal dropout
-            model = nets.make_neural_network(
-                base_arch_name=config["MODEL_NAME"],
-                weights=config.get("PRETRAINED_MODEL", None),
-                image_size=[size, size],
-                n_classes=config["NUM_CLASSES"],
-                input_dtype=tf.float16 if config["TRAIN_MIXED_PRECISION"] else tf.float32,
-                ckpt=None,
-                train_full_network=config["TRAIN_FULL_MODEL"],
-                dropout=dropout,
-                factorize=config["FACTORIZE_FINAL_LAYER"] if "FACTORIZE_FINAL_LAYER" in config else False,
-                fact_rank=config["FACT_RANK"] if "FACT_RANK" in config else None
-            )
+            base_model = EfficientNetV2_S(
+                    input_shape=(size, size, 3),
+                    pretrained=config.get("PRETRAINED_MODEL", None),
+                    classes=config["NUM_CLASSES"],
+                    dropout_rate=dropout,
+                    include_top=True,
+                    final_drop_rate=dropout,
+                    weights=config.get("PRETRAINED_MODEL", None),
+                    factorize_rank=config["FACT_RANK"] if "FACT_RANK" in config else None
+                )
+
+            output = keras.layers.Activation("softmax", dtype="float32", name="predictions")(base_model.output)
+            model = keras.Model(inputs=base_model.inputs, outputs=output)
+            model.summary()
 
             if last_checkpoint != None:
                 model.load_weights(last_checkpoint)

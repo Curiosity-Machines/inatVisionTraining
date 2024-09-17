@@ -39,7 +39,6 @@ def mb_conv_block(inputs,
     has_se = (block_args.se_ratio is not None) and (0 < block_args.se_ratio <= 1)
     bn_axis = 3 if backend.image_data_format() == 'channels_last' else 1
 
-    # Dropout = get_dropout()
     Dropout = layers.Dropout
 
     x = inputs
@@ -131,6 +130,7 @@ def EfficientNetV2(blocks_args,
                    pooling='avg',
                    final_drop_rate=None,
                    classes=1000,
+                   factorize_rank=None,
                    **kwargs):
     """
     Create an EfficientNetV2 model using given inputs.
@@ -177,8 +177,11 @@ def EfficientNetV2(blocks_args,
 
     bn_axis = 3 if backend.image_data_format() == 'channels_last' else 1
 
+    # dopple: properly set range -1, 1
+    x = layers.Rescaling(scale=1.0 / 127.5, offset=-1)(img_input)
+
     # build stem layer
-    x = img_input
+    #x = img_input
 
     x = layers.Conv2D(round_filters(blocks_args[0].input_filters, width_coefficient, depth_divisor), 3,
                       strides=2,
@@ -253,12 +256,23 @@ def EfficientNetV2(blocks_args,
     x = layers.Activation(activation=activation, name='head_activation')(x)
 
     if include_top:
-        x = layers.GlobalAveragePooling2D(name='head_avg_pool')(x)
-        if final_drop_rate and final_drop_rate > 0:
-            x = layers.Dropout(final_drop_rate, name='head_dropout')(x)
-        x = layers.Dense(classes,
-                         kernel_initializer=DENSE_KERNEL_INITIALIZER,
-                         name='probs')(x)
+        if factorize_rank == None:
+            x = layers.GlobalAveragePooling2D(name='head_avg_pool')(x)
+            if final_drop_rate and final_drop_rate > 0:
+                x = layers.Dropout(final_drop_rate, name='head_dropout')(x)
+
+            x = layers.Dense(classes,
+                             kernel_initializer=DENSE_KERNEL_INITIALIZER,
+                             name='probs')(x)
+        else:
+            x = layers.GlobalAveragePooling2D(name='head_avg_pool', keepdims=True)(x)
+            x = layers.Conv2D(factorize_rank, (1, 1))(x)
+
+            if final_drop_rate and final_drop_rate > 0:
+                x = layers.Dropout(final_drop_rate, name='head_dropout')(x)
+
+            x = layers.Conv2D(classes, (1, 1))(x)
+            x = layers.Reshape([classes])(x)
     else:
         if pooling == 'avg':
             x = layers.GlobalAveragePooling2D(name='head_avg_pool')(x)

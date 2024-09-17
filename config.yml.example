@@ -35,14 +35,13 @@ LABEL_SMOOTH_PCT   : 0.1
 TRAIN_MIXED_PRECISION : False
 
 # number of training epochs
-NUM_EPOCHS            : 4
+NUM_EPOCHS           : 8
 
 # initial learning rate for the model
 INITIAL_LEARNING_RATE : 0.256
 LR_DECAY_FACTOR       : 0.97
 EPOCHS_PER_LR_DECAY   : 2.4
-  #FACTORIZE_FINAL_LAYER : true
-  #FACT_RANK             : 2048
+FACT_RANK             : 64
 
 #### MODEL PARAMETERS
 
