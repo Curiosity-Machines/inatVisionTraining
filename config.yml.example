@@ -17,12 +17,12 @@ SHUFFLE_BUFFER_SIZE   : 10000
 
 #### DATASET PARAMETERS
 
-PRETRAINED_MODEL      : "imagenet"
+# PRETRAINED_MODEL      : "imagenet"
 TRAINING_DATA         : "/root/inat2/training_set.trim.csv"
 VAL_DATA              : "/root/inat2/validation_set.test.csv"
 TEST_DATA             : "/root/inat2/validation_set.test.csv"
 NUM_CLASSES           : 81
-TRAIN_FULL_MODEL      : false
+TRAIN_FULL_MODEL      : true
 DO_LABEL_SMOOTH       : true
 LABEL_SMOOTH_MODE     : "flat"
 LABEL_SMOOTH_PCT   : 0.1
@@ -32,20 +32,17 @@ LABEL_SMOOTH_PCT   : 0.1
 
 # training policy - only use mixed precision=true if you
 # have a recent NVIDIA GPU that supports CUDA 7.0 or later
-TRAIN_MIXED_PRECISION : True
-
-# size of batch, per gpu
-BATCH_SIZE            : 256
+TRAIN_MIXED_PRECISION : False
 
 # number of training epochs
 NUM_EPOCHS            : 4
 
 # initial learning rate for the model
-INITIAL_LEARNING_RATE : 0.001
-LR_DECAY_FACTOR       : 0.9
-EPOCHS_PER_LR_DECAY   : 4
-FACTORIZE_FINAL_LAYER : true
-FACT_RANK             : 32
+INITIAL_LEARNING_RATE : 0.256
+LR_DECAY_FACTOR       : 0.97
+EPOCHS_PER_LR_DECAY   : 2.4
+  #FACTORIZE_FINAL_LAYER : true
+  #FACT_RANK             : 2048
 
 #### MODEL PARAMETERS
 
@@ -55,7 +52,8 @@ MODEL_NAME            : "efficientnetb3"
 # size of input
 SIZES                 : [128,185,242,300]
 AUGMENT_MAGNITUDES    : [5,8,12,15]
-DROPOUTS              : [0.1,0.2,0.3,0.4]
+DROPOUTS              : [0.1,0.1666,0.2333,0.3]
+BATCH_SIZES           : [512, 256, 128, 64]
 
 # dropout percentage for layer between pool & logits
 

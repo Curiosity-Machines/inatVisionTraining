@@ -18,14 +18,44 @@ tf.config.optimizer.set_jit(True)
 from datasets import inat_dataset
 from nets import nets
 
-class LRLogger(tf.keras.callbacks.Callback):
-    def on_epoch_begin(self, epoch, logs):
-        lr = self.model.optimizer.learning_rate
-        print("learning rate is {}".format(lr))
-        # wandb.log({"lr": "{}".format(lr)}, commit=False)
+class ExponentialMovingAverage(tf.keras.callbacks.Callback):
+    def __init__(self, decay):
+        super(ExponentialMovingAverage, self).__init__()
+        self.decay = decay
+        self.ema = tf.train.ExponentialMovingAverage(decay=self.decay)
 
+    def on_train_batch_end(self, batch, logs=None):
+        self.ema.apply(self.model.trainable_variables)
 
-def make_training_callbacks(config, iteration, model):
+    def on_epoch_end(self, epoch, logs=None):
+        for var in self.model.trainable_variables:
+            var.assign(self.ema.average(var))
+
+class LearningRateScheduler(tf.keras.callbacks.Callback):
+    def __init__(self, initial_lr, warmup_epochs, total_epochs, decay_rate, decay_steps):
+        super(LearningRateScheduler, self).__init__()
+        self.initial_lr = initial_lr
+        self.warmup_epochs = warmup_epochs
+        self.total_epochs = total_epochs
+        self.decay_rate = decay_rate
+        self.decay_steps = decay_steps
+        self.epoch = 0
+        self.lr = initial_lr
+
+    def on_epoch_begin(self, epoch, logs=None):
+        epoch = self.epoch # Since this spans multiple models
+
+        if epoch < self.warmup_epochs:
+            lr = self.initial_lr * (epoch + 1) / self.warmup_epochs
+        else:
+            lr = self.initial_lr * (self.decay_rate ** ((epoch - self.warmup_epochs) / self.decay_steps))
+        print(self.model.optimizer)
+        self.model.optimizer.learning_rate.assign(lr)
+        print(f"Epoch {epoch+1}: Learning rate is {lr:.6f}.")
+        self.epoch += 1
+        self.lr = lr
+
+def make_training_callbacks(config, iteration, scheduler):
     checkpoint_file_name = f"checkpoint-{iteration}-{{epoch:02d}}.weights.keras"
 
     callbacks = [
@@ -51,7 +81,7 @@ def make_training_callbacks(config, iteration, model):
             backup_dir=config["BACKUP_DIR"],
         ),
         # WandbMetricsLogger(log_freq=config["WANDB_LOG_FREQ"]),
-        LRLogger(),
+        scheduler
     ]
 
     return callbacks
@@ -90,6 +120,14 @@ def main():
     label_to_index = None
     model = None
 
+    scheduler = LearningRateScheduler(
+        initial_lr=config["INITIAL_LEARNING_RATE"],
+        warmup_epochs=5,  # Adjust based on your warmup duration
+        total_epochs=config["NUM_EPOCHS"],
+        decay_rate=config["LR_DECAY_FACTOR"],
+        decay_steps=config["EPOCHS_PER_LR_DECAY"]
+    )
+
     # Phase 1: Progressive Training (Small Images, Minimal Dropout, No Augmentation)
     with strategy.scope():
         batch_sizes = config.get("BATCH_SIZES") 
@@ -115,11 +153,11 @@ def main():
             batch_size = batch_sizes[iteration]
             epoch = epochs_per_iteration * iteration
 
-            print(f"Training iteration {iteration} with {size}x{size}, augment: {magnitude}, dropout: {dropout} for {epochs_per_iteration} epochs, starting from {last_checkpoint}")
+            print(f"Training iteration {iteration} with {size}x{size}, augment: {magnitude}, batch size: {batch_size}, dropout: {dropout} for {epochs_per_iteration} epochs starting from {last_checkpoint}")
 
             # Create optimizer
             optimizer = keras.optimizers.RMSprop(
-                learning_rate=config["INITIAL_LEARNING_RATE"],
+                learning_rate=scheduler.lr,
                 rho=config["RMSPROP_RHO"],
                 momentum=config["RMSPROP_MOMENTUM"],
                 epsilon=config["RMSPROP_EPSILON"],
@@ -172,7 +210,7 @@ def main():
                     var.assign(weight)
 
             # Setup callbacks
-            training_callbacks = make_training_callbacks(config, iteration, model)
+            training_callbacks = make_training_callbacks(config, iteration, scheduler)
 
             (train_ds, num_train_examples, label_to_index) = inat_dataset.make_dataset(
                 config["TRAINING_DATA"],
@@ -226,7 +264,7 @@ def main():
             last_checkpoint = os.path.join(config["CHECKPOINT_DIR"], f"checkpoint-{iteration - 1}-{epochs_per_iteration:02d}.weights.keras")
 
         # Save the final model
-        save_dir = CONFIG["FINAL_SAVE_DIR"]
+        save_dir = config["FINAL_SAVE_DIR"]
         model.save(f"{save_dir}/final.h5")
 
     # wandb.finish()
