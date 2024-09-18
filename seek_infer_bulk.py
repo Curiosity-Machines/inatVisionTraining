@@ -19,6 +19,9 @@ CROPPED_DIRECTORY = "data_cropped"  # Directory where cropped JSONs are saved (e
 # =============================================================
 
 def prepare_image(cropped_image, device):
+    if cropped_image.mode != "RGB":
+        cropped_image = cropped_image.convert("RGB")
+
     image_np = np.array(cropped_image).astype(np.float32) / 255.0  # Normalize to [0, 1]
     image_tensor = torch.from_numpy(image_np).permute(2, 0, 1).unsqueeze(0).to(device)  # Shape: (1, C, H, W)
     resized_tensor = torch.nn.functional.interpolate(image_tensor, size=(IMAGE_SIZE, IMAGE_SIZE), mode='bilinear', align_corners=False)
