@@ -125,6 +125,7 @@ def main():
     with strategy.scope():
         batch_sizes = config.get("BATCH_SIZES") 
         sizes = config.get("SIZES") 
+        lrs = config.get("MAX_LRS") 
         magnitudes = config.get("AUGMENT_MAGNITUDES")
         dropouts = config.get("DROPOUTS")
         last_size = sizes[len(sizes) - 1]
@@ -144,12 +145,13 @@ def main():
             magnitude = magnitudes[iteration]
             dropout = dropouts[iteration]
             batch_size = batch_sizes[iteration]
+            lr = lrs[iteration]
             epoch = epochs_per_iteration * iteration
 
-            print(f"Training iteration {iteration} with {size}x{size}, augment: {magnitude}, batch size: {batch_size}, dropout: {dropout} for {epochs_per_iteration} epochs starting from {last_checkpoint}")
+            print(f"Training iteration {iteration} with {size}x{size}, augment: {magnitude}, lr: {lr}, batch size: {batch_size}, dropout: {dropout} for {epochs_per_iteration} epochs starting from {last_checkpoint}")
 
             scheduler = LearningRateScheduler(
-                initial_lr=config["INITIAL_LEARNING_RATE"],
+                initial_lr=lr,
                 warmup_epochs=10,  # Adjust based on your warmup duration
                 total_epochs=config["NUM_EPOCHS"],
                 decay_rate=config["LR_DECAY_FACTOR"],
@@ -158,7 +160,7 @@ def main():
 
             # Create optimizer
             optimizer = keras.optimizers.RMSprop(
-                learning_rate=config["INITIAL_LEARNING_RATE"],
+                learning_rate=lr,
                 rho=config["RMSPROP_RHO"],
                 momentum=config["RMSPROP_MOMENTUM"],
                 epsilon=config["RMSPROP_EPSILON"],

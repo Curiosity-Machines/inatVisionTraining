@@ -35,10 +35,9 @@ LABEL_SMOOTH_PCT   : 0.1
 TRAIN_MIXED_PRECISION : False
 
 # number of training epochs
-NUM_EPOCHS           : 8
+NUM_EPOCHS           : 120
 
 # initial learning rate for the model
-INITIAL_LEARNING_RATE : 0.256
 LR_DECAY_FACTOR       : 0.97
 EPOCHS_PER_LR_DECAY   : 2.4
 FACT_RANK             : 64
@@ -49,10 +48,12 @@ FACT_RANK             : 64
 MODEL_NAME            : "efficientnetb3"
 
 # size of input
+
 SIZES                 : [128,185,242,300]
 AUGMENT_MAGNITUDES    : [5,8,12,15]
 DROPOUTS              : [0.1,0.1666,0.2333,0.3]
-BATCH_SIZES           : [512, 256, 128, 64]
+BATCH_SIZES           : [256, 128, 72, 46]
+MAX_LRS               : [0.256, 0.225, 0.175, 0.133]
 
 # dropout percentage for layer between pool & logits
 
