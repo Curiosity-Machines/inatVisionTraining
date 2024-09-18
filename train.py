@@ -121,14 +121,6 @@ def main():
     label_to_index = None
     model = None
 
-    scheduler = LearningRateScheduler(
-        initial_lr=config["INITIAL_LEARNING_RATE"],
-        warmup_epochs=10,  # Adjust based on your warmup duration
-        total_epochs=config["NUM_EPOCHS"],
-        decay_rate=config["LR_DECAY_FACTOR"],
-        decay_steps=config["EPOCHS_PER_LR_DECAY"]
-    )
-
     # Phase 1: Progressive Training (Small Images, Minimal Dropout, No Augmentation)
     with strategy.scope():
         batch_sizes = config.get("BATCH_SIZES") 
@@ -156,9 +148,17 @@ def main():
 
             print(f"Training iteration {iteration} with {size}x{size}, augment: {magnitude}, batch size: {batch_size}, dropout: {dropout} for {epochs_per_iteration} epochs starting from {last_checkpoint}")
 
+            scheduler = LearningRateScheduler(
+                initial_lr=config["INITIAL_LEARNING_RATE"],
+                warmup_epochs=10,  # Adjust based on your warmup duration
+                total_epochs=config["NUM_EPOCHS"],
+                decay_rate=config["LR_DECAY_FACTOR"],
+                decay_steps=config["EPOCHS_PER_LR_DECAY"]
+            )
+
             # Create optimizer
             optimizer = keras.optimizers.RMSprop(
-                learning_rate=scheduler.lr,
+                learning_rate=config["INITIAL_LEARNING_RATE"],
                 rho=config["RMSPROP_RHO"],
                 momentum=config["RMSPROP_MOMENTUM"],
                 epsilon=config["RMSPROP_EPSILON"],
@@ -178,7 +178,7 @@ def main():
 
             output = keras.layers.Activation("softmax", dtype="float32", name="predictions")(base_model.output)
             model = keras.Model(inputs=base_model.inputs, outputs=output)
-            model.summary()
+            # model.summary()
 
             if last_checkpoint != None:
                 model.load_weights(last_checkpoint)
@@ -205,11 +205,11 @@ def main():
                 ],
             )
 
-            if optimizer_weights != None:
-                model.optimizer.build(model.trainable_variables)
+            # if optimizer_weights != None:
+            #     model.optimizer.build(model.trainable_variables)
 
-                for var, weight in zip(model.optimizer.variables, optimizer_weights):
-                    var.assign(weight)
+            #     for var, weight in zip(model.optimizer.variables, optimizer_weights):
+            #         var.assign(weight)
 
             # Setup callbacks
             training_callbacks = make_training_callbacks(config, iteration, scheduler)
