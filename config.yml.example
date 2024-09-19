@@ -18,7 +18,7 @@ SHUFFLE_BUFFER_SIZE   : 10000
 #### DATASET PARAMETERS
 
 # PRETRAINED_MODEL      : "imagenet"
-TRAINING_DATA         : "/root/inat2/training_set.trim.csv"
+TRAINING_DATA         : "/root/inat2/training_set.high.csv"
 VAL_DATA              : "/root/inat2/validation_set.test.csv"
 TEST_DATA             : "/root/inat2/validation_set.test.csv"
 NUM_CLASSES           : 81

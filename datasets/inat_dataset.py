@@ -40,32 +40,6 @@ def crop_to_square(image, label):
     return tf.image.resize_with_crop_or_pad(image, min_dim, min_dim), label
 
 def random_crop_to_square(image, label):
-    #shape = tf.shape(image)
-    #height = shape[0]
-    #width = shape[1]
-    #
-    ## Determine the size of the square crop (minimum of height and width)
-    #crop_size = tf.minimum(height, width)
-    #
-    ## Calculate the maximum offset for the crop
-    #max_offset_height = height - crop_size
-    #max_offset_width = width - crop_size
-    #
-    ## Generate random offsets
-    #offset_height = tf.random.uniform(shape=(), maxval=max_offset_height + 1, dtype=tf.int32)
-    #offset_width = tf.random.uniform(shape=(), maxval=max_offset_width + 1, dtype=tf.int32)
-    #
-    ## Perform the crop
-    #cropped_image = tf.image.crop_to_bounding_box(
-    #    image,
-    #    offset_height=offset_height,
-    #    offset_width=offset_width,
-    #    target_height=crop_size,
-    #    target_width=crop_size
-    #)
-    #
-    #return cropped_image, label
-
     bbox = tf.constant([0.0, 0.0, 1.0, 1.0], dtype=tf.float32, shape=[1, 1, 4])
 
     begin, size, bbox_for_draw = tf.image.sample_distorted_bounding_box(
@@ -113,34 +87,6 @@ def _prepare_dataset(
 ):
     if repeat_forever:
         ds = ds.repeat()
-
-    #if augment:
-    #    # crop 100% of the time
-    #    ds = ds.map(lambda x, y: _random_crop(x, y), num_parallel_calls=AUTOTUNE)
-    #else:
-    #    # central crop
-    #    ds = ds.map(lambda x, y: (tf.image.central_crop(x, 0.875), y), num_parallel_calls=AUTOTUNE)
-
-    #ds = ds.map(lambda x, y: (tf.image.resize(x, image_size), y), num_parallel_calls=AUTOTUNE)
-
-    #if augment:
-    #    # flip 50% of the time
-    #    # the function already flips 50% of the time, so we call it 100% of the time
-    #    ds = ds.map(lambda x, y: _flip(x, y), num_parallel_calls=AUTOTUNE)
-    #    # do color 30% of the time
-    #    ds = ds.map(
-    #        lambda x, y: tf.cond(
-    #            tf.random.uniform([], 0, 1) > 0.7, lambda: _color(x, y), lambda: (x, y)
-    #        ),
-    #        num_parallel_calls=AUTOTUNE,
-    #    )
-    #    # make sure the color transforms haven't move any of the pixels outside of [0,1]
-    #    ds = ds.map(
-    #        lambda x, y: (tf.clip_by_value(x, 0, 1), y), num_parallel_calls=AUTOTUNE
-    #    )
-
-    ## Convert to uint8 0-255
-    #ds = ds.map(lambda x, y: (tf.cast(x * 255, tf.uint8), y), num_parallel_calls=AUTOTUNE)
 
     if augment_magnitude > 0.0:
         aa = augment.RandAugment(magnitude=augment_magnitude, num_layers=3, exclude_ops=['Invert', 'Posterize', 'Solarize', 'SolarizeAdd'])
