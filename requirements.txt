@@ -1,5 +1,6 @@
 pandas==2.2.2
-tensorflow==2.17.0
-PyYAML>=6.0.2
-numpy==2.1.1
-wandb==0.18.0
+tensorflow[and-cuda]==2.17.0
+PyYAML==6.0.2
+numpy==1.26.4
+wandb==0.18.1
+tf-keras

@@ -56,7 +56,7 @@ def mb_conv_block(inputs,
         x = layers.BatchNormalization(axis=bn_axis, name=f'{prefix}expand_bn')(x)
         x = layers.Activation(activation=activation, name=f'{prefix}expand_activation')(x)
 
-    if mb_type is 'normal':
+    if mb_type == 'normal':
         x = layers.DepthwiseConv2D(block_args.kernel_size,
                                    block_args.strides,
                                    depthwise_initializer=CONV_KERNEL_INITIALIZER,

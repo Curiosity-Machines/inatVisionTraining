@@ -5,24 +5,24 @@
 WANDB_PROJECT         : "inat"
 WANDB_LOG_FREQ        : 100
 MULTIGPU              : true
-VALIDATION_PASS_SIZE  : 150
+VALIDATION_PASS_SIZE  : 40800
 
 #### EXPERIMENT PARAMETERS
-TENSORBOARD_LOG_DIR   : "/root/inat2/log_dir"
-CHECKPOINT_DIR        : "/root/inat2/checkpoints/ckpt"
-FINAL_SAVE_DIR        : "/root/inat2/final_model/final"
-BACKUP_DIR            : "/root/inat2/backup"
+TENSORBOARD_LOG_DIR   : "/root/inatVisionTraining/log_dir"
+CHECKPOINT_DIR        : "/root/inatVisionTraining/checkpoints/ckpt"
+FINAL_SAVE_DIR        : "/root/inatVisionTraining/final_model/final"
+BACKUP_DIR            : "/root/inatVisionTraining/backup"
 SHUFFLE_BUFFER_SIZE   : 10000
 
 
 #### DATASET PARAMETERS
 
-# PRETRAINED_MODEL      : "imagenet"
-TRAINING_DATA         : "/root/inat2/training_set.high.csv"
-VAL_DATA              : "/root/inat2/validation_set.test.csv"
-TEST_DATA             : "/root/inat2/validation_set.test.csv"
-NUM_CLASSES           : 81
-TRAIN_FULL_MODEL      : true
+PRETRAINED_MODEL      : "imagenet"
+TRAINING_DATA         : "/root/inatVisionTraining/training_set.csv"
+VAL_DATA              : "/root/inatVisionTraining/validation_set.csv"
+TEST_DATA             : "/root/inatVisionTraining/validation_set.csv"
+NUM_CLASSES           : 9598
+TRAIN_FULL_MODEL      : false
 DO_LABEL_SMOOTH       : true
 LABEL_SMOOTH_MODE     : "flat"
 LABEL_SMOOTH_PCT   : 0.1
@@ -32,15 +32,17 @@ LABEL_SMOOTH_PCT   : 0.1
 
 # training policy - only use mixed precision=true if you
 # have a recent NVIDIA GPU that supports CUDA 7.0 or later
-TRAIN_MIXED_PRECISION : False
+TRAIN_MIXED_PRECISION : True
 
 # number of training epochs
-NUM_EPOCHS           : 120
+NUM_EPOCHS            : 16
 
 # initial learning rate for the model
-LR_DECAY_FACTOR       : 0.97
-EPOCHS_PER_LR_DECAY   : 2.4
-FACT_RANK             : 64
+INITIAL_LEARNING_RATE : 0.01
+LR_DECAY_FACTOR       : 0.9
+EPOCHS_PER_LR_DECAY   : 4
+FACTORIZE_FINAL_LAYER : true
+FACT_RANK             : 2048
 
 #### MODEL PARAMETERS
 
@@ -48,14 +50,10 @@ FACT_RANK             : 64
 MODEL_NAME            : "efficientnetb3"
 
 # size of input
-
+BATCH_SIZES           : [4096, 2048, 1024, 512]
 SIZES                 : [128,185,242,300]
 AUGMENT_MAGNITUDES    : [5,8,12,15]
-DROPOUTS              : [0.1,0.1666,0.2333,0.3]
-BATCH_SIZES           : [256, 128, 72, 46]
-MAX_LRS               : [0.256, 0.225, 0.175, 0.133]
-
-# dropout percentage for layer between pool & logits
+DROPOUTS              : [0.1,0.2,0.3,0.4]
 
 # optiimzer
 OPTIMIZER_NAME        : "rmsprop"

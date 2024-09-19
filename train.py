@@ -16,7 +16,6 @@ AUTOTUNE = tf.data.AUTOTUNE
 tf.config.optimizer.set_jit(True) 
 
 from datasets import inat_dataset
-from nets import nets
 from efficientnetv2 import EfficientNetV2_S
 
 class ExponentialMovingAverage(tf.keras.callbacks.Callback):
