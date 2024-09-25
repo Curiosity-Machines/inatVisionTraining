@@ -5,7 +5,7 @@
 WANDB_PROJECT         : "inat"
 WANDB_LOG_FREQ        : 100
 MULTIGPU              : true
-VALIDATION_PASS_SIZE  : 40800
+VALIDATION_PASS_SIZE  : 41000
 
 #### EXPERIMENT PARAMETERS
 TENSORBOARD_LOG_DIR   : "/root/inatVisionTraining/log_dir"
@@ -17,12 +17,12 @@ SHUFFLE_BUFFER_SIZE   : 10000
 
 #### DATASET PARAMETERS
 
-PRETRAINED_MODEL      : "imagenet"
-TRAINING_DATA         : "/root/inatVisionTraining/training_set.csv"
-VAL_DATA              : "/root/inatVisionTraining/validation_set.csv"
-TEST_DATA             : "/root/inatVisionTraining/validation_set.csv"
+# PRETRAINED_MODEL      : "imagenet"
+TRAINING_DATA         : "/root/inatVisionTraining/training_set.trim.csv"
+VAL_DATA              : "/root/inatVisionTraining/validation_set.trim.csv"
+TEST_DATA             : "/root/inatVisionTraining/validation_set.trim.csv"
 NUM_CLASSES           : 9598
-TRAIN_FULL_MODEL      : false
+TRAIN_FULL_MODEL      : true
 DO_LABEL_SMOOTH       : true
 LABEL_SMOOTH_MODE     : "flat"
 LABEL_SMOOTH_PCT   : 0.1
@@ -32,17 +32,15 @@ LABEL_SMOOTH_PCT   : 0.1
 
 # training policy - only use mixed precision=true if you
 # have a recent NVIDIA GPU that supports CUDA 7.0 or later
-TRAIN_MIXED_PRECISION : True
+TRAIN_MIXED_PRECISION : False
 
 # number of training epochs
-NUM_EPOCHS            : 16
+NUM_EPOCHS           : 32
 
 # initial learning rate for the model
-INITIAL_LEARNING_RATE : 0.01
-LR_DECAY_FACTOR       : 0.9
-EPOCHS_PER_LR_DECAY   : 4
-FACTORIZE_FINAL_LAYER : true
-FACT_RANK             : 2048
+LR_DECAY_FACTOR       : 0.99
+EPOCHS_PER_LR_DECAY   : 2.4
+FACT_RANK             : 64
 
 #### MODEL PARAMETERS
 
@@ -50,10 +48,27 @@ FACT_RANK             : 2048
 MODEL_NAME            : "efficientnetb3"
 
 # size of input
-BATCH_SIZES           : [4096, 2048, 1024, 512]
-SIZES                 : [128,185,242,300]
-AUGMENT_MAGNITUDES    : [5,8,12,15]
-DROPOUTS              : [0.1,0.2,0.3,0.4]
+
+  #p1: got through epoch1 of phase 2 before failing to improve
+#SIZES                 : [128,185,242,300]
+#AUGMENT_MAGNITUDES    : [5,8,12,15]
+#DROPOUTS              : [0.1,0.1666,0.2333,0.3]
+#BATCH_SIZES           : [2048, 1024, 512, 256]
+#MAX_LRS               : [0.256, 0.225, 0.175, 0.133]
+
+  # SIZES                 : [242,300]
+  # AUGMENT_MAGNITUDES    : [12,15]
+  # DROPOUTS              : [0.2333,0.3]
+  # BATCH_SIZES           : [512, 256]
+  # MAX_LRS               : [0.125, 0.1]
+
+SIZES                 : [340]
+AUGMENT_MAGNITUDES    : [17]
+DROPOUTS              : [0.2000]
+BATCH_SIZES           : [192]
+MAX_LRS               : [0.0025]
+
+# dropout percentage for layer between pool & logits
 
 # optiimzer
 OPTIMIZER_NAME        : "rmsprop"
