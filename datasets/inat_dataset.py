@@ -4,6 +4,7 @@ from functools import partial
 from tensorflow.keras import backend as K
 import json
 import augment
+import os
 
 AUTOTUNE = tf.data.AUTOTUNE
 
@@ -119,41 +120,67 @@ def make_dataset(
 ):
     df = _load_dataframe(path)
     num_examples = len(df)
-    num_classes = len(df[label_column_name].unique())
-
-    if label_to_index is None:
-       # **Training Set**: Create label mapping
-       labels = sorted(df[label_column_name].unique())
-       label_to_index = {int(label): index for index, label in enumerate(labels)}
-       num_classes = len(labels)
     
-       # Write it to a file
-       with open(path.replace(".csv", "_label_mapping.json"), "w") as f:
-          json.dump(label_to_index, f)
+    if label_to_index is None:
+        # If the json file exists, open it and start from those labels
+        if os.path.exists(path.replace(".csv", "_label_mapping.json")):
+            with open(path.replace(".csv", "_label_mapping.json"), "r") as f:
+                label_to_index = json.load(f)
+                label_to_index = {int(label): value for label, value in label_to_index.items()}
+        else:
+            label_to_index = {}
+
+        # Append new labels to the existing label_to_index
+        existing_labels = set(label_to_index.keys())
+        dataset_labels = set(df[label_column_name].unique())
+        new_labels = dataset_labels - existing_labels
+
+        if new_labels:
+            max_index = max(label_to_index.values())
+            new_label_to_index = {int(label): idx + max_index for idx, label in enumerate(new_labels)}
+            # Merge the existing and new label_to_index
+            updated_label_to_index = {**label_to_index, **new_label_to_index}
+            label_to_index = updated_label_to_index
+            
+        # No new labels to append
+        num_classes = len(label_to_index)
+
+        # Write the updated label_to_index to JSON
+        with open(path.replace(".csv", "_label_mapping.json"), "w") as f:
+            dump_label_to_index = {str(label): value for label, value in label_to_index.items()}
+            json.dump(dump_label_to_index, f)
     else:
-        # **Validation Set**: Use existing label mapping
+        # **Validation Set**: Use existing label mapping without appending
         num_classes = len(label_to_index)
         # Verify that all labels in validation set are present in training set
         unique_val_labels = set(df[label_column_name].unique())
         missing_labels = unique_val_labels - set(label_to_index.keys())
         if missing_labels:
-            raise ValueError(f"set contains labels not in training set: {missing_labels}")
-
+            raise ValueError(f"Dataset contains labels not in the provided label_to_index: {len(missing_labels)} labels")
+    
     df['label_index'] = df[label_column_name].map(label_to_index)
+    
+    # Check for any unmapped labels after mapping
+    if df['label_index'].isnull().any():
+        unmapped = df[df['label_index'].isnull()][label_column_name].unique()
+        raise ValueError(f"Found labels in the dataset that are not in label_to_index: {unmapped}")
+    
+    df['label_index'] = df['label_index'].astype(int)
+    
     ds = tf.data.Dataset.from_tensor_slices((df["photo_id"], df["label_index"]))
-
+    
     ds = ds.shuffle(buffer_size=shuffle_buffer_size, reshuffle_each_iteration=True)
-
+    
     process_partial = partial(_process, num_classes=num_classes)
     ds = ds.map(process_partial, num_parallel_calls=AUTOTUNE)
-
+    
     ds = _prepare_dataset(
         ds,
         image_size=image_size,
         batch_size=batch_size,
         repeat_forever=repeat_forever,
         augment_magnitude=augment_magnitude,
+        label_to_index=label_to_index,  # Pass label_to_index if needed
     )
-
+    
     return (ds, num_examples, label_to_index)
-

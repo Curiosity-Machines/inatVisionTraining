@@ -179,10 +179,26 @@ def main():
 
             output = keras.layers.Activation("softmax", dtype="float32", name="predictions")(base_model.output)
             model = keras.Model(inputs=base_model.inputs, outputs=output)
-            # model.summary()
 
-            if last_checkpoint != None:
-                model.load_weights(last_checkpoint)
+            if config["TRAIN_FULL_MODEL"] == False:
+                num_layers_to_train = 6 # Train 
+
+                conv_layer_1 = model.layers[len(model.layers) - 1 - 2] # Classifier convent
+                conv_layer_2 = model.layers[len(model.layers) - 1 - 4] # Factorization covnet
+                conv_layer_3 = model.layers[len(model.layers) - 1 - 8] # Head covnet
+
+                for i in range(0, len(model.layers)):
+                    layer = model.layers[i]
+                    layer.trainable = layer == conv_layer_1 or layer == conv_layer_2 of layer == conv_layer_3
+
+                if last_checkpoint != None:
+                    model.load_weights(last_checkpoint, skip_mismatch=True)
+            else:
+                if last_checkpoint != None:
+                    model.load_weights(last_checkpoint)
+
+            #model.summary()
+
 
             # Define loss
             if config["DO_LABEL_SMOOTH"]:
